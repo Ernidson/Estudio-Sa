@@ -707,29 +707,30 @@ export class PieceMap {
   }
   
   /**
-   * Calcula pivô na articulação do osso pai
+   * Calcula pivô na articulação do osso (joint do próprio osso)
+   * Para o antebraço, o pivô deve estar no cotovelo (próprio osso), não no pai
    */
   calculatePivot(regionId) {
     const region = this.regions.get(regionId);
     if (!region) return { x: 0.5, y: 0.5 };
     
     const bone = this.rig.getBone(region.boneId);
-    if (!bone || !bone.parent) return { x: 0.5, y: 0.5 };
+    if (!bone) return { x: 0.5, y: 0.5 };
     
-    // Posição do pai em coordenadas da região
-    const parentWorld = bone.parent.getWorldPoint();
+    // A articulação está na posição mundial do PRÓPRIO osso (joint)
+    const jointWorld = bone.getWorldPoint();
     const imgCenterX = this.characterObject.imageWidth / 2;
     const imgCenterY = this.characterObject.imageHeight / 2;
     
-    const parentLocalX = parentWorld.x - imgCenterX;
-    const parentLocalY = parentWorld.y - imgCenterY;
+    const jointLocalX = jointWorld.x - imgCenterX;
+    const jointLocalY = jointWorld.y - imgCenterY;
     
     // Converte para coordenadas relativas ao bounds da máscara
     const mask = this.generateMask(regionId);
     if (!mask) return { x: 0.5, y: 0.5 };
     
-    const relX = (parentLocalX - mask.bounds.x) / mask.bounds.width;
-    const relY = (parentLocalY - mask.bounds.y) / mask.bounds.height;
+    const relX = (jointLocalX - mask.bounds.x) / mask.bounds.width;
+    const relY = (jointLocalY - mask.bounds.y) / mask.bounds.height;
     
     return { x: Math.max(0, Math.min(1, relX)), y: Math.max(0, Math.min(1, relY)) };
   }

@@ -109,7 +109,6 @@ export class PartManager {
         y: pt.y - sy
       }));
       
-      ctx.save();
       ctx.beginPath();
       ctx.moveTo(adjustedPoints[0].x, adjustedPoints[0].y);
       for (let i = 1; i < adjustedPoints.length; i++) {
@@ -117,14 +116,19 @@ export class PartManager {
       }
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(canvas, 0, 0);
+      // Redesenha a imagem original recortada no polígono
+      ctx.drawImage(
+        this.characterObject.imageElement,
+        sx, sy, sw, sh,
+        0, 0, sw, sh
+      );
       ctx.restore();
     }
     
     // Converte para Data URL
     const imageData = canvas.toDataURL('image/png');
     
-    // Calcula posição local relativa ao osso pai
+    // Calcula posição local relativa à articulação do osso (joint do próprio osso)
     // A posição da peça no espaço do personagem (centro da imagem = 0,0)
     const pieceCenterX = bounds.x + bounds.width / 2;
     const pieceCenterY = bounds.y + bounds.height / 2;
@@ -135,19 +139,15 @@ export class PartManager {
     let localX = pieceCenterX - charCenterX;
     let localY = pieceCenterY - charCenterY;
     
-    // Converte para coordenadas locais do osso pai
-    // bone já foi obtido no início da função
-    if (bone.parent) {
-      const parentWorld = bone.parent.getWorldPoint();
-      localX = localX - parentWorld.x;
-      localY = localY - parentWorld.y;
-    } else {
-      // Raiz do rig - converte para espaço do rig
-      const rigInv = this.rig.baseTransform.getInverse();
-      const rigLocal = this.rig.baseTransform.getInverse().transformPoint(localX, localY);
-      localX = rigLocal.x;
-      localY = rigLocal.y;
-    }
+    // Converte para coordenadas locais da articulação do osso (joint do próprio osso)
+    // A articulação está na posição mundial do PRÓPRIO osso
+    const jointWorld = bone.getWorldPoint();
+    const jointLocalX = jointWorld.x - this.characterObject.imageWidth / 2;
+    const jointLocalY = jointWorld.y - this.characterObject.imageHeight / 2;
+    
+    // Posição local relativa à articulação do osso
+    localX = localX - jointLocalX;
+    localY = localY - jointLocalY;
     
     // Cria a peça
     const part = new Part({

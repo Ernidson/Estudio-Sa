@@ -1425,7 +1425,8 @@ async function generatePieceFromMap() {
     
     // Ajusta pivô para a articulação do cotovelo
     part.pivot = pivot;
-    part.localTransform = null; // Será recriado no próximo update
+    // Atualiza a transformação local usando o método correto da classe Part
+    part.updateLocalTransform();
     
     updateStatus(`Peça "${part.name}" gerada com sucesso! Pivô no cotovelo.`);
     
