@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rigby Studio 2D</title>
+  <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Barra superior -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <h1 class="app-title">Rigby Studio 2D</h1>
+      </div>
+      <div class="top-bar-center">
+        <button id="btn-new-project" class="btn" title="Novo Projeto (Ctrl+N)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          Novo
+        </button>
+        <button id="btn-open-project" class="btn" title="Abrir Projeto (Ctrl+O)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          Abrir
+        </button>
+        <button id="btn-save-project" class="btn" title="Guardar Projeto (Ctrl+S)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          Guardar
+        </button>
+        <button id="btn-import-png" class="btn" title="Importar PNG">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Importar PNG
+        </button>
+        <button id="btn-prepare-character" class="btn" title="Preparar Personagem (Criar Armadura)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Preparar Personagem
+        </button>
+        <button id="btn-cut-piece" class="btn" title="Recortar Peça" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6.5 6.5h11v11h-11z"></path>
+            <path d="M9 9h6v6H9z"></path>
+            <line x1="6" y1="6" x2="3" y2="3"></line>
+            <line x1="18" y1="6" x2="21" y2="3"></line>
+            <line x1="6" y1="18" x2="3" y2="21"></line>
+            <line x1="18" y1="18" x2="21" y2="21"></line>
+          </svg>
+          Recortar Peça
+        </button>
+        <button id="btn-piece-map" class="btn" title="Mapa de Peças" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          Mapa de Peças
+        </button>
+        <button id="btn-exit-rigging" class="btn" title="Sair Modo Armadura" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          Sair Armadura
+        </button>
+        <input type="file" id="file-import-png" accept="image/png" style="display: none;">
+      </div>
+    </header>
+
+    <!-- Área principal -->
+    <main class="main-area">
+      <!-- Painel esquerdo - Camadas -->
+      <aside class="panel panel-left">
+        <div class="panel-header">
+          <h2>Camadas</h2>
+        </div>
+        <div class="panel-content">
+          <ul id="layers-list" class="layers-list"></ul>
+        </div>
+      </aside>
+
+      <!-- Área central - Canvas -->
+      <section class="canvas-area">
+        <div class="canvas-container">
+          <canvas id="main-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Painel direito - Propriedades / Armadura -->
+      <aside class="panel panel-right">
+        <div class="panel-header">
+          <h2 id="props-title">Propriedades</h2>
+        </div>
+        <div class="panel-content">
+          <!-- Painel de propriedades normal -->
+          <div id="no-selection" class="no-selection">
+            <p>Selecione uma imagem para editar as propriedades.</p>
+          </div>
+          <div id="properties-form" class="properties-form hidden">
+            <div class="form-group">
+              <label for="prop-name">Nome</label>
+              <input type="text" id="prop-name" readonly>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="prop-x">Posição X</label>
+                <input type="number" id="prop-x" step="0.1">
+              </div>
+              <div class="form-group">
+                <label for="prop-y">Posição Y</label>
+                <input type="number" id="prop-y" step="0.1">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="prop-rotation">Rotação (graus)</label>
+              <input type="number" id="prop-rotation" step="0.1">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="prop-scale-x">Escala X</label>
+                <input type="number" id="prop-scale-x" step="0.01" min="0.01">
+              </div>
+              <div class="form-group">
+                <label for="prop-scale-y">Escala Y</label>
+                <input type="number" id="prop-scale-y" step="0.01" min="0.01">
+              </div>
+            </div>
+            <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformação</button>
+          </div>
+          
+          <!-- Painel de rigging (armadura) -->
+          <div id="rigging-panel" class="rigging-panel hidden">
+            <!-- Propriedades do bone selecionado -->
+            <div id="no-bone-selected" class="no-selection">
+              <p>Selecione uma articulação para editar.</p>
+            </div>
+            <div id="bone-properties-form" class="properties-form hidden">
+              <div class="form-group">
+                <label for="bone-prop-name">Nome</label>
+                <input type="text" id="bone-prop-name">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="bone-prop-x">Posição Local X</label>
+                  <input type="number" id="bone-prop-x" step="0.1">
+                </div>
+                <div class="form-group">
+                  <label for="bone-prop-y">Posição Local Y</label>
+                  <input type="number" id="bone-prop-y" step="0.1">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="bone-prop-world-x">Mundo X</label>
+                  <output id="bone-prop-world-x">0</output>
+                </div>
+                <div class="form-group">
+                  <label for="bone-prop-world-y">Mundo Y</label>
+                  <output id="bone-prop-world-y">0</output>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="bone-prop-side">Lado</label>
+                  <output id="bone-prop-side">center</output>
+                </div>
+                <div class="form-group">
+                  <label for="bone-prop-type">Tipo</label>
+                  <output id="bone-prop-type">joint</output>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="bone-prop-parent">Pai</label>
+                <select id="bone-prop-parent">
+                  <option value="">(nenhum - raiz)</option>
+                </select>
+              </div>
+              
+              <!-- Botões de ação -->
+              <div class="rigging-actions">
+                <button id="btn-reset-rig" class="btn btn-secondary" title="Repor para sugestão automática">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                  </svg>
+                  Repor Sugestão
+                </button>
+                <button id="btn-toggle-rig" class="btn btn-secondary" title="Mostrar/Ocultar Armadura">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                  Ocultar Armadura
+                </button>
+                <button id="btn-toggle-labels" class="btn btn-secondary" title="Mostrar/Ocultar Nomes">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="19" x2="4" y2="5"></line>
+                    <line x1="4" y1="5" x2="20" y2="5"></line>
+                    <line x1="20" y1="5" x2="20" y2="19"></line>
+                    <text x="12" y="12" text-anchor="middle" font-size="8">T</text>
+                  </svg>
+                  Mostrar Nomes
+                </button>
+              </div>
+              
+              <!-- Botões de recorte (visíveis apenas no modo de recorte) -->
+              <div id="cutting-actions" class="rigging-actions hidden">
+                <button id="btn-confirm-cut" class="btn btn-primary" title="Confirmar recorte (Enter)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  Confirmar Recorte
+                </button>
+                <button id="btn-cancel-cut" class="btn btn-secondary" title="Cancelar recorte (Esc)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  Cancelar
+                </button>
+              </div>
+              
+              <!-- Botões do Mapa de Peças (visíveis apenas no modo Mapa de Peças) -->
+              <div id="piece-map-actions" class="rigging-actions hidden">
+                <button id="btn-preview-piece" class="btn btn-secondary" title="Pré-visualizar Peça">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="2" width="20" height="20" rx="2"></rect>
+                    <path d="M6 6h12v12H6z"></path>
+                    <path d="M10 6v12"></path>
+                    <path d="M14 6v12"></path>
+                    <path d="M6 10h12"></path>
+                    <path d="M6 14h12"></path>
+                  </svg>
+                  Pré-visualizar
+                </button>
+                <button id="btn-generate-piece" class="btn btn-primary" title="Gerar Peça Real">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                  Gerar Peça
+                </button>
+                <button id="btn-exit-piece-map" class="btn btn-secondary" title="Sair Mapa de Peças (Esc)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  Sair
+                </button>
+              </div>
+            </div>
+            
+            <!-- Hierarquia da armadura -->
+            <div class="rig-hierarchy-section">
+              <h3>Hierarquia</h3>
+              <ul id="rig-hierarchy-list" class="rig-hierarchy-list"></ul>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Barra de status -->
+    <footer class="status-bar">
+      <div id="status-message">Pronto</div>
+      <div id="canvas-info"></div>
+    </footer>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rigby Studio 2D - Teste Visual</title>
+  <style>
+    body { margin: 0; padding: 20px; font-family: sans-serif; background: #1e1e1e; color: #ccc; }
+    h1 { color: #fff; }
+    .test-section { margin-bottom: 30px; padding: 15px; background: #252526; border-radius: 4px; }
+    button { padding: 8px 16px; margin: 5px; background: #007acc; color: white; border: none; border-radius: 3px; cursor: pointer; }
+    button:hover { background: #1c97ea; }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
+    canvas { border: 1px solid #3c3c3c; background: #2d2d30; display: block; margin: 10px 0; }
+    .log { background: #1e1e1e; padding: 10px; font-family: monospace; font-size: 12px; max-height: 200px; overflow: auto; border: 1px solid #333; }
+    .log-entry { margin: 2px 0; }
+    .log-success { color: #4ec9b0; }
+    .log-error { color: #f44747; }
+    .log-info { color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <h1>Rigby Studio 2D - Testes Visuais</h1>
+
+  <div class="test-section">
+    <h2>1. Teste Básico do Canvas</h2>
+    <button id="test-canvas">Testar Canvas</button>
+    <canvas id="test-canvas-el" width="400" height="300"></canvas>
+    <div id="canvas-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. Transform2D</h2>
+    <button id="test-transform">Testar Transform2D</button>
+    <div id="transform-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>3. Scene & SceneObject</h2>
+    <button id="test-scene">Testar Scene</button>
+    <div id="scene-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>4. Importação PNG (simulada)</h2>
+    <button id="test-import">Testar Importação</button>
+    <div id="import-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>5. Serialização/Projeto</h2>
+    <button id="test-serialization">Testar Serialização</button>
+    <div id="serialization-log" class="log"></div>
+  </div>
+
+  <script type="module">
+    // Importa módulos
+    import { Transform2D, createTransform } from '../src/core/Transform2D.js';
+    import { Scene, SceneObject } from '../src/core/Scene.js';
+    import { projectStorage } from '../src/core/ProjectStorage.js';
+    import { generateId, validatePNGFile, createSceneObjectFromFile } from '../src/editor/ImageImporter.js';
+
+    function log(elementId, message, type = 'info') {
+      const el = document.getElementById(elementId);
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = message;
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function clearLog(elementId) {
+      document.getElementById(elementId).innerHTML = '';
+    }
+
+    // 1. Teste Canvas
+    document.getElementById('test-canvas').addEventListener('click', () => {
+      clearLog('canvas-log');
+      const canvas = document.getElementById('test-canvas-el');
+      const ctx = canvas.getContext('2d');
+
+      // Limpa
+      ctx.fillStyle = '#2d2d30';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grelha
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 50) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Eixos
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      ctx.strokeStyle = '#cc4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(canvas.width, cy);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#44cc44';
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, canvas.height);
+      ctx.stroke();
+
+      // Origem
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Quadrado de teste no centro
+      ctx.fillStyle = '#007acc';
+      ctx.fillRect(cx - 25, cy - 25, 50, 50);
+
+      log('canvas-log', 'Canvas renderizado com grelha, eixos e quadrado central', 'success');
+    });
+
+    // 2. Teste Transform2D
+    document.getElementById('test-transform').addEventListener('click', () => {
+      clearLog('transform-log');
+
+      try {
+        // Identidade
+        const t1 = new Transform2D();
+        const d1 = t1.decompose();
+        log('transform-log', `Identidade: x=${d1.x}, y=${d1.y}, rot=${d1.rotation}, sx=${d1.scaleX}, sy=${d1.scaleY}`, 'success');
+
+        // Translação
+        const t2 = new Transform2D().translate(100, -50);
+        const d2 = t2.decompose();
+        log('transform-log', `Translação (100, -50): x=${d2.x}, y=${d2.y}`, d2.x === 100 && d2.y === -50 ? 'success' : 'error');
+
+        // Rotação 90°
+        const t3 = new Transform2D().rotate(90);
+        const d3 = t3.decompose();
+        log('transform-log', `Rotação 90°: rot=${d3.rotation.toFixed(1)}°`, Math.abs(d3.rotation - 90) < 0.1 ? 'success' : 'error');
+
+        // Escala
+        const t4 = new Transform2D().scale(2, 0.5);
+        const d4 = t4.decompose();
+        log('transform-log', `Escala (2, 0.5): sx=${d4.scaleX}, sy=${d4.scaleY}`, d4.scaleX === 2 && d4.scaleY === 0.5 ? 'success' : 'error');
+
+        // Compose/Decompose round-trip
+        const t5 = createTransform(10, 20, 45, 2, 3);
+        const d5 = t5.decompose();
+        const t6 = createTransform(d5.x, d5.y, d5.rotation, d5.scaleX, d5.scaleY);
+        log('transform-log', `Round-trip compose/decompose: ${t5.equals(t6) ? 'OK' : 'FALHOU'}`, t5.equals(t6) ? 'success' : 'error');
+
+        // TransformPoint / InverseTransformPoint
+        const t7 = createTransform(100, 50, 30, 2, 2);
+        const world = t7.transformPoint(10, 20);
+        const local = t7.inverseTransformPoint(world.x, world.y);
+        log('transform-log', `TransformPoint/Inverse: local(${local.x.toFixed(2)}, ${local.y.toFixed(2)})`, (Math.abs(local.x - 10) < 0.01 && Math.abs(local.y - 20) < 0.01) ? 'success' : 'error');
+
+        // Inversão
+        const t8 = createTransform(10, 20, 45, 2, 3);
+        const inv = t8.getInverse();
+        const result = t8.clone().multiply(inv);
+        const d8 = result.decompose();
+        log('transform-log', `Matriz * Inversa = Identidade: ${(Math.abs(d8.x) < 0.001 && Math.abs(d8.y) < 0.001) ? 'OK' : 'FALHOU'}`, (Math.abs(d8.x) < 0.001 && Math.abs(d8.y) < 0.001) ? 'success' : 'error');
+
+      } catch (e) {
+        log('transform-log', `Erro: ${e.message}`, 'error');
+      }
+    });
+
+    // 3. Teste Scene
+    document.getElementById('test-scene').addEventListener('click', () => {
+      clearLog('scene-log');
+
+      try {
+        const scene = new Scene();
+
+        // Add objetos
+        const obj1 = new SceneObject({ name: 'Obj1', imageWidth: 100, imageHeight: 100 });
+        const obj2 = new SceneObject({ name: 'Obj2', imageWidth: 100, imageHeight: 100 });
+        obj2.transform.translate(200, 0);
+
+        scene.addObject(obj1);
+        scene.addObject(obj2);
+
+        log('scene-log', `Objetos adicionados: ${scene.objects.length}`, 'success');
+
+        // GetObjectAt
+        const hit1 = scene.getObjectAt(0, 0);
+        log('scene-log', `Clique em (0,0): ${hit1 ? hit1.name : 'nada'}`, hit1 === obj1 ? 'success' : 'error');
+
+        const hit2 = scene.getObjectAt(200, 0);
+        log('scene-log', `Clique em (200,0): ${hit2 ? hit2.name : 'nada'}`, hit2 === obj2 ? 'success' : 'error');
+
+        const hit3 = scene.getObjectAt(500, 500);
+        log('scene-log', `Clique em (500,500): ${hit3 ? hit3.name : 'nada'}`, hit3 === null ? 'success' : 'error');
+
+        // ContainsPoint com rotação
+        const objRot = new SceneObject({
+          name: 'Rotacionado',
+          imageWidth: 100,
+          imageHeight: 50,
+          transform: { matrix: [0, 1, -1, 0, 0, 0] } // 90°
+        });
+        scene.addObject(objRot);
+
+        const hitRot = scene.getObjectAt(0, 0);
+        log('scene-log', `Objeto rotacionado 90° em (0,0): ${hitRot ? hitRot.name : 'nada'}`, hitRot === objRot ? 'success' : 'error');
+
+        // Bounds
+        const bounds = objRot.getWorldBounds();
+        log('scene-log', `Bounds rotacionado: w=${bounds.width.toFixed(1)}, h=${bounds.height.toFixed(1)}`, (Math.abs(bounds.width - 50) < 1 && Math.abs(bounds.height - 100) < 1) ? 'success' : 'error');
+
+        // Layer order
+        scene.moveObjectToLayerOrder(obj1.id, 2);
+        log('scene-log', `Layer order após mover Obj1 para topo: ${scene.objects[2].name}`, scene.objects[2].id === obj1.id ? 'success' : 'error');
+
+      } catch (e) {
+        log('scene-log', `Erro: ${e.message}`, 'error');
+      }
+    });
+
+    // 4. Teste Importação
+    document.getElementById('test-import').addEventListener('click', () => {
+      clearLog('import-log');
+
+      try {
+        // Gera ID
+        const ids = new Set();
+        for (let i = 0; i < 10; i++) ids.add(generateId());
+        log('import-log', `generateId: ${ids.size}/10 únicos`, ids.size === 10 ? 'success' : 'error');
+
+        // Valida PNG
+        const validFile = new File(['test'], 'test.png', { type: 'image/png' });
+        const validResult = validatePNGFile(validFile);
+        log('import-log', `validatePNGFile (válido): ${validResult.valid ? 'OK' : 'FALHOU'}`, validResult.valid ? 'success' : 'error');
+
+        const invalidFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+        const invalidResult = validatePNGFile(invalidFile);
+        log('import-log', `validatePNGFile (inválido): ${!invalidResult.valid ? 'OK' : 'FALHOU'}`, !invalidResult.valid ? 'success' : 'error');
+
+        // Cria SceneObject (mock)
+        const mockDataURL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='; // 1x1 pixel transparente
+        const obj = new SceneObject({
+          name: 'Teste Import',
+          imageData: mockDataURL,
+          imageWidth: 100,
+          imageHeight: 100
+        });
+        log('import-log', `SceneObject criado: ${obj.name} (${obj.imageWidth}x${obj.imageHeight})`, 'success');
+
+      } catch (e) {
+        log('import-log', `Erro: ${e.message}`, 'error');
+      }
+    });
+
+    // 5. Teste Serialização
+    document.getElementById('test-serialization').addEventListener('click', () => {
+      clearLog('serialization-log');
+
+      try {
+        // Novo projeto
+        const proj = projectStorage.createNewProject('Projeto Teste');
+        log('serialization-log', `Novo projeto: ${proj.name} (${proj.projectId})`, 'success');
+
+        // Adiciona objetos
+        const mockDataURL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+        const obj1 = new SceneObject({
+          name: 'Imagem1',
+          imageWidth: 200,
+          imageHeight: 100,
+          imageData: mockDataURL,
+          transform: { matrix: [0, 1, -1, 0, 0, 0] } // 90°
+        });
+        const obj2 = new SceneObject({
+          name: 'Imagem2',
+          imageWidth: 150,
+          imageHeight: 150,
+          imageData: mockDataURL,
+          transform: { matrix: [2, 0, 0, 2, 100, -50] }
+        });
+
+        proj.objects.push(obj1.toJSON(), obj2.toJSON());
+        proj.nextLayerOrder = 2;
+
+        // Serializa
+        const json = projectStorage.serialize(proj);
+        log('serialization-log', `Serializado: ${json.length} chars`, 'success');
+
+        // Desserializa
+        const proj2 = projectStorage.deserialize(json);
+        log('serialization-log', `Desserializado: ${proj2.name} com ${proj2.objects.length} objetos`, 'success');
+
+        // Verifica transformações preservadas
+        const o1 = proj2.objects[0];
+        const t1 = Transform2D.fromJSON(o1.transform);
+        const d1 = t1.decompose();
+        log('serialization-log', `Obj1 rot: ${d1.rotation.toFixed(1)}° (esperado 90°)`, Math.abs(d1.rotation - 90) < 0.1 ? 'success' : 'error');
+
+        const o2 = proj2.objects[1];
+        const t2 = Transform2D.fromJSON(o2.transform);
+        const d2 = t2.decompose();
+        log('serialization-log', `Obj2 pos: (${d2.x.toFixed(1)}, ${d2.y.toFixed(1)}) escala: (${d2.scaleX.toFixed(1)}, ${d2.scaleY.toFixed(1)})`,
+          (Math.abs(d2.x - 100) < 0.1 && Math.abs(d2.y + 50) < 0.1 && Math.abs(d2.scaleX - 2) < 0.1 && Math.abs(d2.scaleY - 2) < 0.1) ? 'success' : 'error');
+
+        // Validação
+        const validation = projectStorage.validateProject(proj2);
+        log('serialization-log', `Validação: ${validation.valid ? 'Válido' : 'Inválido'}`, validation.valid ? 'success' : 'error');
+
+      } catch (e) {
+        log('serialization-log', `Erro: ${e.message}`, 'error');
+      }
+    });
+
+    // Auto-executa teste de canvas
+    document.getElementById('test-canvas').click();
+  </script>
+</body>
+</html>
