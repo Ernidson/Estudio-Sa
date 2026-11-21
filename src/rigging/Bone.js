@@ -45,10 +45,13 @@ export class Bone {
   }
 
   /**
-   * Atualiza a transformação local a partir da posição local
+   * Atualiza a transformação local a partir da posição local e rotação
+   * Preserva a rotação e escala existentes, apenas atualiza a translação
    */
   updateLocalTransform() {
-    this.localTransform = createTransform(this.localPosition.x, this.localPosition.y);
+    const currentRotation = this.localTransform.getRotation();
+    const currentScale = this.localTransform.getScale();
+    this.localTransform = createTransform(this.localPosition.x, this.localPosition.y, currentRotation, currentScale.x, currentScale.y);
   }
 
   /**
@@ -58,6 +61,34 @@ export class Bone {
     this.localPosition.x = x;
     this.localPosition.y = y;
     this.updateLocalTransform();
+  }
+
+  /**
+   * Define rotação local em graus
+   */
+  setLocalRotation(degrees) {
+    const currentPos = this.localTransform.getTranslation();
+    const currentScale = this.localTransform.getScale();
+    const radians = degrees * Math.PI / 180;
+    this.localTransform = createTransform(currentPos.x, currentPos.y, radians, currentScale.x, currentScale.y);
+    // Atualiza localPosition para manter consistência
+    this.localPosition.x = currentPos.x;
+    this.localPosition.y = currentPos.y;
+  }
+
+  /**
+   * Obtém rotação local em graus
+   */
+  getLocalRotation() {
+    return this.localTransform.getRotation() * 180 / Math.PI;
+  }
+
+  /**
+   * Adiciona rotação local (relativa)
+   */
+  rotateLocal(deltaDegrees) {
+    const currentRotation = this.getLocalRotation();
+    this.setLocalRotation(currentRotation + deltaDegrees);
   }
 
   /**

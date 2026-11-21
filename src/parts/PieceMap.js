@@ -1,12 +1,12 @@
 /**
- * PieceMap - Mapa de Peças automático baseado na armadura
- * Gera regiões coloridas para cada parte do corpo a partir dos ossos
+ * PieceMap - Mapa de Pecas automatico baseado na armadura
+ * Gera regioes coloridas para cada parte do corpo a partir dos ossos
  * Inspirado no Skinning Editor do Unity
  */
 
 import { Transform2D } from '../core/Transform2D.js';
 
-// Cores pré-definidas para cada região (RGBA semi-transparente)
+// Cores pre-definidas para cada regiao (RGBA semi-transparente)
 // IDs correspondem ao preset 'humanoid-work-reference'
 const REGION_COLORS = {
   bacia: 'rgba(200, 100, 255, 0.4)',
@@ -26,7 +26,7 @@ const REGION_COLORS = {
   anca_direita: 'rgba(200, 255, 100, 0.4)',
   joelho_direito: 'rgba(150, 255, 50, 0.4)',
   tornozelo_direito: 'rgba(100, 255, 50, 0.4)',
-  // Regiões anatómicas especiais
+  // Regioes anatomicas especiais
   cabeca_anatomica: 'rgba(255, 100, 100, 0.5)',
   pescoco_anatomico: 'rgba(255, 150, 100, 0.5)',
   mao_esquerda: 'rgba(255, 100, 50, 0.5)',
@@ -39,8 +39,8 @@ const REGION_NAMES_PT = {
   bacia: 'Bacia',
   coluna: 'Coluna',
   peito: 'Peito',
-  pescoco: 'Pescoço',
-  cabeca: 'Cabeça',
+  pescoco: 'Pescoco',
+  cabeca: 'Cabeca',
   ombro_esquerdo: 'Ombro Esquerdo',
   cotovelo_esquerdo: 'Cotovelo Esquerdo',
   pulso_esquerdo: 'Pulso Esquerdo',
@@ -53,288 +53,270 @@ const REGION_NAMES_PT = {
   anca_direita: 'Anca Direita',
   joelho_direito: 'Joelho Direito',
   tornozelo_direito: 'Tornozelo Direito',
-  // Regiões anatómicas especiais
-  cabeca_anatomica: 'Cabeça e Cabelo',
-  pescoco_anatomico: 'Pescoço',
-  mao_esquerda: 'Mão Esquerda',
-  mao_direita: 'Mão Direita',
-  pe_esquerdo: 'Pé Esquerdo',
-  pe_direito: 'Pé Direito',
+  // Regioes anatomicas especiais
+  cabeca_anatomica: 'Cabeca e Cabelo',
+  pescoco_anatomico: 'Pescoco',
+  mao_esquerda: 'Mao Esquerda',
+  mao_direita: 'Mao Direita',
+  pe_esquerdo: 'Pe Esquerdo',
+  pe_direito: 'Pe Direito',
 };
 
 /**
- * Gera uma região poligonal para um osso baseado no seu segmento até o filho
+ * Gera uma regiao poligonal para um osso baseado no seu segmento ate o filho
  * @param {Bone} bone - Osso pai
  * @param {Bone} child - Osso filho (opcional)
- * @param {number} width - Largura da região em torno do osso
- * @returns {Array} Pontos do polígono em coordenadas mundiais
+ * @param {number} width - Largura da regiao em torno do osso
+ * @returns {Array} Pontos do poligono em coordenadas mundiais
  */
 export function generateBoneRegion(bone, child, width = 30) {
   if (!bone.worldTransform) return null;
-  
+
   const parentPos = bone.getWorldPoint();
   let childPos;
-  
+
   if (child && child.worldTransform) {
     childPos = child.getWorldPoint();
   } else {
-    // Se não tem filho, estende na direção do osso
-    const dir = bone.getDirection ? bone.getDirection() : { x: 0, y: -1 };
+    const dir = bone.getDirectionVector();
     childPos = {
-      x: parentPos.x + dir.x * (bone.length || 50),
-      y: parentPos.y + dir.y * (bone.length || 50)
+      x: parentPos.x + dir.x * 50,
+      y: parentPos.y + dir.y * 50,
     };
   }
-  
-  // Vetor direção do osso
+
   const dx = childPos.x - parentPos.x;
   const dy = childPos.y - parentPos.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  
-  if (len === 0) return null;
-  
-  // Normal perpendicular
-  const nx = -dy / len;
-  const ny = dx / len;
-  
-  const halfWidth = width;
-  
-  // 4 cantos do retângulo orientado
+  const length = Math.sqrt(dx * dx + dy * dy);
+
+  if (length === 0) return null;
+
+  const nx = -dy / length;
+  const ny = dx / length;
+  const halfWidth = width / 2;
+
   return [
     { x: parentPos.x + nx * halfWidth, y: parentPos.y + ny * halfWidth },
     { x: parentPos.x - nx * halfWidth, y: parentPos.y - ny * halfWidth },
     { x: childPos.x - nx * halfWidth, y: childPos.y - ny * halfWidth },
-    { x: childPos.x + nx * halfWidth, y: childPos.y + ny * halfWidth }
+    { x: childPos.x + nx * halfWidth, y: childPos.y + ny * halfWidth },
   ];
 }
 
 /**
- * Gera região cónica (tapered) para membros que afinam
+ * Gera regiao conica (tapered) para membros que afinam
  * @param {Bone} bone - Osso pai
  * @param {Bone} child - Osso filho
- * @param {number} widthStart - Largura no início
+ * @param {number} widthStart - Largura no inicio
  * @param {number} widthEnd - Largura no fim
- * @returns {Array} Pontos do polígono cónico
+ * @returns {Array} Pontos do poligono conico
  */
 export function generateTaperedBoneRegion(bone, child, widthStart = 30, widthEnd = 20) {
   if (!bone.worldTransform || !child.worldTransform) return null;
-  
+
   const parentPos = bone.getWorldPoint();
   const childPos = child.getWorldPoint();
-  
-  // Vetor direção do osso
+
   const dx = childPos.x - parentPos.x;
   const dy = childPos.y - parentPos.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  
-  if (len === 0) return null;
-  
-  // Normal perpendicular
-  const nx = -dy / len;
-  const ny = dx / len;
-  
-  const halfWidthStart = widthStart;
-  const halfWidthEnd = widthEnd;
-  
-  // 4 cantos do trapézio orientado
+  const length = Math.sqrt(dx * dx + dy * dy);
+
+  if (length === 0) return null;
+
+  const nx = -dy / length;
+  const ny = dx / length;
+  const halfStart = widthStart / 2;
+  const halfEnd = widthEnd / 2;
+
   return [
-    { x: parentPos.x + nx * halfWidthStart, y: parentPos.y + ny * halfWidthStart },
-    { x: parentPos.x - nx * halfWidthStart, y: parentPos.y - ny * halfWidthStart },
-    { x: childPos.x - nx * halfWidthEnd, y: childPos.y - ny * halfWidthEnd },
-    { x: childPos.x + nx * halfWidthEnd, y: childPos.y + ny * halfWidthEnd }
+    { x: parentPos.x + nx * halfStart, y: parentPos.y + ny * halfStart },
+    { x: parentPos.x - nx * halfStart, y: parentPos.y - ny * halfStart },
+    { x: childPos.x - nx * halfEnd, y: childPos.y - ny * halfEnd },
+    { x: childPos.x + nx * halfEnd, y: childPos.y + ny * halfEnd },
   ];
 }
 
 /**
- * Gera região para osso terminal (sem filho) - usa octógono
+ * Gera regiao para osso terminal (sem filho) - usa octogono
+ * @param {Bone} bone - Osso terminal
+ * @param {number} width - Largura da regiao
+ * @returns {Array} Pontos do octogono
  */
 export function generateEndBoneRegion(bone, width = 30) {
   if (!bone.worldTransform) return null;
-  
+
   const pos = bone.getWorldPoint();
-  const radius = width;
-  
-  // Gera octógono aproximado
+  const radius = width / 2;
+
   const points = [];
   for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
+    const angle = (i * Math.PI * 2) / 8;
     points.push({
       x: pos.x + Math.cos(angle) * radius,
-      y: pos.y + Math.sin(angle) * radius
+      y: pos.y + Math.sin(angle) * radius,
     });
   }
   return points;
 }
 
 /**
- * Gera região anatómica para a cabeça (inclui cabelo)
- * Cria um polígono oval alongado verticalmente para cobrir cabeça e cabelo
+ * Gera regiao anatomica para a cabeca (inclui cabelo)
+ * @param {Bone} bone - Osso da cabeca
+ * @param {number} imageHeight - Altura da imagem
+ * @param {number} imageWidth - Largura da imagem
+ * @returns {Array} Pontos do poligono
  */
 export function generateHeadRegion(bone, imageHeight, imageWidth) {
   if (!bone.worldTransform) return null;
-  
+
   const pos = bone.getWorldPoint();
-  // Cabeça: oval alongado verticalmente, centrado na articulação da cabeça
-  // Mais largo na base (cabelo), mais estreito no topo
-  const widthTop = 50;
-  const widthBottom = 80;
-  const height = 120;
-  
+  const headRadius = Math.min(imageWidth, imageHeight) * 0.08;
+
+  const points = [];
+  for (let i = 0; i < 16; i++) {
+    const angle = (i * Math.PI * 2) / 16;
+    const r = headRadius * (1 + 0.15 * Math.sin(angle * 4));
+    points.push({
+      x: pos.x + Math.cos(angle) * r,
+      y: pos.y + Math.sin(angle) * r,
+    });
+  }
+  return points;
+}
+
+/**
+ * Gera regiao anatomica para o pescoco
+ * Conecta a cabeca ao tronco, formato cilindrico
+ * @param {Bone} neckBone - Osso do pescoco
+ * @param {Bone} headBone - Osso da cabeca
+ * @returns {Array} Pontos do poligono
+ */
+export function generateNeckRegion(neckBone, headBone) {
+  if (!neckBone.worldTransform || !headBone.worldTransform) return null;
+
+  const neckPos = neckBone.getWorldPoint();
+  const headPos = headBone.getWorldPoint();
+
+  const dx = headPos.x - neckPos.x;
+  const dy = headPos.y - neckPos.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+
+  if (length === 0) return null;
+
+  const nx = -dy / length;
+  const ny = dx / length;
+  const neckWidth = 25;
+
   return [
-    { x: pos.x - widthTop / 2, y: pos.y - height * 0.6 },      // Topo esquerdo
-    { x: pos.x + widthTop / 2, y: pos.y - height * 0.6 },      // Topo direito
-    { x: pos.x + widthBottom / 2, y: pos.y + height * 0.4 },   // Base direita (cabelo)
-    { x: pos.x - widthBottom / 2, y: pos.y + height * 0.4 }    // Base esquerda (cabelo)
+    { x: neckPos.x + nx * neckWidth / 2, y: neckPos.y + ny * neckWidth / 2 },
+    { x: neckPos.x - nx * neckWidth / 2, y: neckPos.y - ny * neckWidth / 2 },
+    { x: headPos.x - nx * neckWidth / 2, y: headPos.y - ny * neckWidth / 2 },
+    { x: headPos.x + nx * neckWidth / 2, y: headPos.y + ny * neckWidth / 2 },
   ];
 }
 
 /**
- * Gera região anatómica para o pescoço
- * Conecta a cabeça ao tronco, formato cilíndrico
+ * Gera regiao anatomica para a mao (pulso)
+ * Forma aproximada da silhueta da mao com dedos
+ * @param {Bone} wristBone - Osso do pulso
+ * @param {boolean} isLeft - Se e mao esquerda
+ * @returns {Array} Pontos do poligono
  */
-export function generateNeckRegion(bone, child) {
-  if (!bone.worldTransform || !child || !child.worldTransform) return null;
-  
-  const parentPos = bone.getWorldPoint();
-  const childPos = child.getWorldPoint();
-  
-  const dx = childPos.x - parentPos.x;
-  const dy = childPos.y - parentPos.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  
-  if (len === 0) return null;
-  
-  const nx = -dy / len;
-  const ny = dx / len;
-  
-  const halfWidth = 25; // Pescoço mais estreito
-  
+export function generateHandRegion(wristBone, isLeft = true) {
+  if (!wristBone.worldTransform) return null;
+
+  const pos = wristBone.getWorldPoint();
+  const handSize = 22;
+  const fingerLength = 18;
+  const thumbOffset = isLeft ? -1 : 1;
+
   return [
-    { x: parentPos.x + nx * halfWidth, y: parentPos.y + ny * halfWidth },
-    { x: parentPos.x - nx * halfWidth, y: parentPos.y - ny * halfWidth },
-    { x: childPos.x - nx * halfWidth, y: childPos.y - ny * halfWidth },
-    { x: childPos.x + nx * halfWidth, y: childPos.y + ny * halfWidth }
+    { x: pos.x - handSize / 2, y: pos.y - handSize / 3 },
+    { x: pos.x + handSize / 2, y: pos.y - handSize / 3 },
+    { x: pos.x + handSize / 2, y: pos.y + handSize / 2 },
+    { x: pos.x + thumbOffset * handSize / 3, y: pos.y + handSize / 2 },
+    { x: pos.x + thumbOffset * handSize / 3, y: pos.y + handSize / 2 + fingerLength },
+    { x: pos.x - thumbOffset * handSize / 3, y: pos.y + handSize / 2 + fingerLength },
+    { x: pos.x - thumbOffset * handSize / 3, y: pos.y + handSize / 2 },
+    { x: pos.x - handSize / 2, y: pos.y + handSize / 2 },
   ];
 }
 
 /**
- * Gera região anatómica para a mão (pulso)
- * Formato que acompanha a silhueta da mão com dedos
+ * Gera regiao anatomica para o pe/sapatilha (tornozelo)
+ * @param {Bone} ankleBone - Osso do tornozelo
+ * @param {boolean} isLeft - Se e pe esquerdo
+ * @returns {Array} Pontos do poligono
  */
-export function generateHandRegion(bone, isLeft = true) {
-  if (!bone.worldTransform) return null;
-  
-  const pos = bone.getWorldPoint();
-  // Mão: forma aproximada da palma + dedos
-  // Mais larga na base do pulso, estreita nos dedos
-  const palmWidth = 45;
-  const palmHeight = 35;
-  const fingerLength = 45;
-  const fingerSpread = 40;
-  
+export function generateFootRegion(ankleBone, isLeft = true) {
+  if (!ankleBone.worldTransform) return null;
+
+  const pos = ankleBone.getWorldPoint();
+  const footLength = 35;
+  const footWidth = 14;
+  const heelWidth = 16;
+  const ankleHeight = 12;
   const dir = isLeft ? 1 : -1;
-  
-  return [
-    // Palma - lado externo (lado do mindinho)
-    { x: pos.x - dir * palmWidth / 2, y: pos.y - palmHeight / 2 },
-    { x: pos.x - dir * palmWidth / 2, y: pos.y + palmHeight / 2 },
-    // Dedos - lado externo
-    { x: pos.x - dir * fingerSpread / 2, y: pos.y + palmHeight / 2 + fingerLength },
-    // Topo dos dedos (curva suave)
-    { x: pos.x, y: pos.y + palmHeight / 2 + fingerLength + 5 },
-    { x: pos.x + dir * fingerSpread / 2, y: pos.y + palmHeight / 2 + fingerLength },
-    // Palma - lado interno (lado do polegar)
-    { x: pos.x + dir * palmWidth / 2, y: pos.y + palmHeight / 2 },
-    { x: pos.x + dir * palmWidth / 2, y: pos.y - palmHeight / 2 }
-  ];
-}
 
-/**
- * Gera região anatómica para o pé/sapatilha (tornozelo)
- * Formato que acompanha a sapatilha completa
- */
-export function generateFootRegion(bone, isLeft = true) {
-  if (!bone.worldTransform) return null;
-  
-  const pos = bone.getWorldPoint();
-  // Pé/Sapatilha: formato alongado, mais largo na ponta
-  const footLength = 90;
-  const heelWidth = 35;
-  const toeWidth = 50;
-  const ankleHeight = 25;
-  
-  const dir = isLeft ? 1 : -1;
-  
   return [
-    // Calcanhar
     { x: pos.x - dir * heelWidth / 2, y: pos.y - ankleHeight / 2 },
-    { x: pos.x - dir * heelWidth / 2, y: pos.y + ankleHeight / 2 },
-    // Lateral externa do pé
-    { x: pos.x + dir * footLength * 0.3, y: pos.y + toeWidth / 2 },
-    { x: pos.x + dir * footLength * 0.7, y: pos.y + toeWidth / 2 },
-    // Ponta do pé
-    { x: pos.x + dir * footLength, y: pos.y },
-    { x: pos.x + dir * footLength * 0.7, y: pos.y - toeWidth / 2 },
-    { x: pos.x + dir * footLength * 0.3, y: pos.y - toeWidth / 2 },
-    // Lateral interna do pé
-    { x: pos.x - dir * heelWidth / 2, y: pos.y - ankleHeight / 2 }
+    { x: pos.x + dir * heelWidth / 2, y: pos.y - ankleHeight / 2 },
+    { x: pos.x + dir * footWidth / 2, y: pos.y },
+    { x: pos.x + dir * footWidth / 2, y: pos.y + footLength / 3 },
+    { x: pos.x + dir * footWidth, y: pos.y + footLength / 2 },
+    { x: pos.x + dir * footWidth / 1.5, y: pos.y + footLength },
+    { x: pos.x - dir * footWidth / 3, y: pos.y + footLength },
+    { x: pos.x - dir * footWidth / 2, y: pos.y + footLength * 0.8 },
+    { x: pos.x - dir * footWidth / 2, y: pos.y + footLength / 3 },
+    { x: pos.x - dir * footWidth / 2, y: pos.y },
   ];
 }
 
 /**
- * Classe para gerenciar o Mapa de Peças
+ * Classe para gerenciar o Mapa de Pecas
  */
 export class PieceMap {
   constructor(characterObject, rig, renderer) {
     this.characterObject = characterObject;
     this.rig = rig;
     this.renderer = renderer;
-    this.regions = new Map(); // boneId -> { points, color, name, boneId, selected }
+    this.regions = new Map();
     this.selectedRegionId = null;
     this.hoveredRegionId = null;
     this.controlPointRadius = 8;
     this.isEditing = false;
     this.draggedPointIndex = -1;
     this.draggedRegionId = null;
-    
-    // Callbacks
+
     this.onSelectionChange = null;
     this.onRegionChange = null;
   }
-  
+
   /**
-   * Gera regiões automáticas para todos os ossos da armadura
+   * Gera regioes automaticas para todos os ossos da armadura
    */
   generateRegions() {
     this.regions.clear();
-    
+
     if (!this.rig || !this.characterObject) return;
-    
+
     const bones = this.rig.getAllBones();
-    
-    // Transformação inversa do personagem (world -> character local)
+
     const charInv = this.characterObject.transform.getInverse();
-    
-    // Primeiro: gera regiões baseadas nos ossos (membros, tronco, etc.)
+
     for (const bone of bones) {
-      // Encontra filho direto (apenas um para simplicidade)
       const child = bone.children[0];
-      
+
       let points;
-      
-      // Regiões cónicas (tapered) para membros que afinam
-      // Antebraços: cotovelo -> pulso
-      // Coxas: anca -> joelho
+
       const isLeftForearm = bone.id === 'cotovelo_esquerdo' && child && child.id === 'pulso_esquerdo';
       const isRightForearm = bone.id === 'cotovelo_direito' && child && child.id === 'pulso_direito';
       const isLeftThigh = bone.id === 'anca_esquerda' && child && child.id === 'joelho_esquerdo';
       const isRightThigh = bone.id === 'anca_direita' && child && child.id === 'joelho_direito';
-      
+
       if (isLeftForearm || isRightForearm) {
-        // Antebraços: mais largos no cotovelo, mais finos no pulso
         points = generateTaperedBoneRegion(bone, child, 35, 20);
       } else if (isLeftThigh || isRightThigh) {
-        // Coxas: mais largas na anca, mais finas no joelho
         points = generateTaperedBoneRegion(bone, child, 40, 25);
       } else if (child) {
         const baseWidth = this.getBoneWidth(bone);
@@ -342,16 +324,14 @@ export class PieceMap {
       } else {
         points = generateEndBoneRegion(bone, this.getBoneWidth(bone));
       }
-      
+
       if (!points || points.length < 3) continue;
-      
-      // Converte pontos de coordenadas mundiais para coordenadas locais do personagem
+
       const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-      
-      // Determina cor e nome
+
       const color = REGION_COLORS[bone.id] || this.getRandomColor();
       const name = REGION_NAMES_PT[bone.id] || bone.name;
-      
+
       this.regions.set(bone.id, {
         id: bone.id,
         boneId: bone.id,
@@ -364,11 +344,7 @@ export class PieceMap {
         generated: true
       });
     }
-    
-    // --- REGIÕES ANATÓMICAS ESPECIAIS ---
-    // Estas são regiões adicionais que melhoram a precisão anatómica
-    
-    // 1. CABEÇA (inclui cabelo) - região separada para 'cabeca'
+
     const headBone = this.rig.getBone('cabeca');
     if (headBone && headBone.worldTransform) {
       const points = generateHeadRegion(headBone, this.characterObject.imageHeight, this.characterObject.imageWidth);
@@ -380,124 +356,120 @@ export class PieceMap {
           points: localPoints.map(p => ({ x: p.x, y: p.y })),
           originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
           color: REGION_COLORS['cabeca_anatomica'] || 'rgba(255, 100, 100, 0.5)',
-          name: 'Cabeça e Cabelo',
+          name: 'Cabeca e Cabelo',
           selected: false,
           visible: true,
           generated: true,
           anatomical: true
         });
       }
-      
-      // 2. PESCOÇO - região separada para 'pescoco'
-      const neckBone = this.rig.getBone('pescoco');
-      const headBone2 = this.rig.getBone('cabeca');
-      if (neckBone && neckBone.worldTransform && headBone2 && headBone2.worldTransform) {
-        const points = generateNeckRegion(neckBone, headBone2);
-        if (points && points.length >= 3) {
-          const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-          this.regions.set('pescoco_anatomico', {
-            id: 'pescoco_anatomico',
-            boneId: 'pescoco',
-            points: localPoints.map(p => ({ x: p.x, y: p.y })),
-            originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
-            color: REGION_COLORS['pescoco_anatomico'] || 'rgba(255, 150, 100, 0.5)',
-            name: 'Pescoço',
-            selected: false,
-            visible: true,
-            generated: true,
-            anatomical: true
-          });
-        }
+    }
+
+    const neckBone = this.rig.getBone('pescoco');
+    const headBone2 = this.rig.getBone('cabeca');
+    if (neckBone && neckBone.worldTransform && headBone2 && headBone2.worldTransform) {
+      const points = generateNeckRegion(neckBone, headBone2);
+      if (points && points.length >= 3) {
+        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        this.regions.set('pescoco_anatomico', {
+          id: 'pescoco_anatomico',
+          boneId: 'pescoco',
+          points: localPoints.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
+          color: REGION_COLORS['pescoco_anatomico'] || 'rgba(255, 150, 100, 0.5)',
+          name: 'Pescoco',
+          selected: false,
+          visible: true,
+          generated: true,
+          anatomical: true
+        });
       }
-      
-      // 3. MÃO ESQUERDA - região separada para 'pulso_esquerdo'
-      const leftWristBone = this.rig.getBone('pulso_esquerdo');
-      if (leftWristBone && leftWristBone.worldTransform) {
-        const points = generateHandRegion(leftWristBone, true);
-        if (points && points.length >= 3) {
-          const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-          this.regions.set('mao_esquerda', {
-            id: 'mao_esquerda',
-            boneId: 'pulso_esquerdo',
-            points: localPoints.map(p => ({ x: p.x, y: p.y })),
-            originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
-            color: REGION_COLORS['mao_esquerda'] || 'rgba(255, 100, 50, 0.5)',
-            name: 'Mão Esquerda',
-            selected: false,
-            visible: true,
-            generated: true,
-            anatomical: true
-          });
-        }
+    }
+
+    const leftWristBone = this.rig.getBone('pulso_esquerdo');
+    if (leftWristBone && leftWristBone.worldTransform) {
+      const points = generateHandRegion(leftWristBone, true);
+      if (points && points.length >= 3) {
+        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        this.regions.set('mao_esquerda', {
+          id: 'mao_esquerda',
+          boneId: 'pulso_esquerdo',
+          points: localPoints.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
+          color: REGION_COLORS['mao_esquerda'] || 'rgba(255, 100, 50, 0.5)',
+          name: 'Mao Esquerda',
+          selected: false,
+          visible: true,
+          generated: true,
+          anatomical: true
+        });
       }
-      
-      // 4. MÃO DIREITA - região separada para 'pulso_direito'
-      const rightWristBone = this.rig.getBone('pulso_direito');
-      if (rightWristBone && rightWristBone.worldTransform) {
-        const points = generateHandRegion(rightWristBone, false);
-        if (points && points.length >= 3) {
-          const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-          this.regions.set('mao_direita', {
-            id: 'mao_direita',
-            boneId: 'pulso_direito',
-            points: localPoints.map(p => ({ x: p.x, y: p.y })),
-            originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
-            color: REGION_COLORS['mao_direita'] || 'rgba(50, 100, 255, 0.5)',
-            name: 'Mão Direita',
-            selected: false,
-            visible: true,
-            generated: true,
-            anatomical: true
-          });
-        }
+    }
+
+    const rightWristBone = this.rig.getBone('pulso_direito');
+    if (rightWristBone && rightWristBone.worldTransform) {
+      const points = generateHandRegion(rightWristBone, false);
+      if (points && points.length >= 3) {
+        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        this.regions.set('mao_direita', {
+          id: 'mao_direita',
+          boneId: 'pulso_direito',
+          points: localPoints.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
+          color: REGION_COLORS['mao_direita'] || 'rgba(50, 100, 255, 0.5)',
+          name: 'Mao Direita',
+          selected: false,
+          visible: true,
+          generated: true,
+          anatomical: true
+        });
       }
-      
-      // 5. PÉ ESQUERDO - região separada para 'tornozelo_esquerdo'
-      const leftAnkleBone = this.rig.getBone('tornozelo_esquerdo');
-      if (leftAnkleBone && leftAnkleBone.worldTransform) {
-        const points = generateFootRegion(leftAnkleBone, true);
-        if (points && points.length >= 3) {
-          const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-          this.regions.set('pe_esquerdo', {
-            id: 'pe_esquerdo',
-            boneId: 'tornozelo_esquerdo',
-            points: localPoints.map(p => ({ x: p.x, y: p.y })),
-            originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
-            color: REGION_COLORS['pe_esquerdo'] || 'rgba(50, 255, 100, 0.5)',
-            name: 'Pé Esquerdo',
-            selected: false,
-            visible: true,
-            generated: true,
-            anatomical: true
-          });
-        }
+    }
+
+    const leftAnkleBone = this.rig.getBone('tornozelo_esquerdo');
+    if (leftAnkleBone && leftAnkleBone.worldTransform) {
+      const points = generateFootRegion(leftAnkleBone, true);
+      if (points && points.length >= 3) {
+        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        this.regions.set('pe_esquerdo', {
+          id: 'pe_esquerdo',
+          boneId: 'tornozelo_esquerdo',
+          points: localPoints.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
+          color: REGION_COLORS['pe_esquerdo'] || 'rgba(50, 255, 100, 0.5)',
+          name: 'Pe Esquerdo',
+          selected: false,
+          visible: true,
+          generated: true,
+          anatomical: true
+        });
       }
-      
-      // 6. PÉ DIREITO - região separada para 'tornozelo_direito'
-      const rightAnkleBone = this.rig.getBone('tornozelo_direito');
-      if (rightAnkleBone && rightAnkleBone.worldTransform) {
-        const points = generateFootRegion(rightAnkleBone, false);
-        if (points && points.length >= 3) {
-          const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
-          this.regions.set('pe_direito', {
-            id: 'pe_direito',
-            boneId: 'tornozelo_direito',
-            points: localPoints.map(p => ({ x: p.x, y: p.y })),
-            originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
-            color: REGION_COLORS['pe_direito'] || 'rgba(100, 255, 50, 0.5)',
-            name: 'Pé Direito',
-            selected: false,
-            visible: true,
-            generated: true,
-            anatomical: true
-          });
-        }
+    }
+
+    const rightAnkleBone = this.rig.getBone('tornozelo_direito');
+    if (rightAnkleBone && rightAnkleBone.worldTransform) {
+      const points = generateFootRegion(rightAnkleBone, false);
+      if (points && points.length >= 3) {
+        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        this.regions.set('pe_direito', {
+          id: 'pe_direito',
+          boneId: 'tornozelo_direito',
+          points: localPoints.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: localPoints.map(p => ({ x: p.x, y: p.y })),
+          color: REGION_COLORS['pe_direito'] || 'rgba(100, 255, 50, 0.5)',
+          name: 'Pe Direito',
+          selected: false,
+          visible: true,
+          generated: true,
+          anatomical: true
+        });
       }
-    
+    }
+
     console.log(`PieceMap: ${this.regions.size} regioes geradas`);
   }
-  
-  getBoneWidth = (bone) => {
+
+  getBoneWidth(bone) {
     const widths = {
       bacia: 45,
       coluna: 35,
@@ -518,31 +490,30 @@ export class PieceMap {
       tornozelo_direito: 22,
     };
     return widths[bone.id] || 25;
-  };
-  
+  }
+
   getRandomColor() {
     const h = Math.random() * 360;
     return `hsla(${h}, 70%, 60%, 0.4)`;
   }
-  
+
   /**
-   * Converte coordenadas de tela para espaço local do personagem
+   * Converte coordenadas de tela para espaco local do personagem
    */
   screenToCharacterLocal(screenX, screenY) {
     const worldPos = this.renderer.screenToWorld(screenX, screenY);
     const charInv = this.characterObject.transform.getInverse();
     return charInv.transformPoint(worldPos.x, worldPos.y);
   }
-  
+
   /**
-   * Hit test em regiões - retorna regionId ou null
+   * Hit test em regioes - retorna regionId ou null
    */
   hitTestRegion(screenX, screenY) {
     const localPos = this.screenToCharacterLocal(screenX, screenY);
-    
-    // Testa em ordem reversa (último desenhado = por cima)
+
     const regionArray = Array.from(this.regions.values()).reverse();
-    
+
     for (const region of regionArray) {
       if (!region.visible) continue;
       if (this.pointInPolygon(localPos.x, localPos.y, region.points)) {
@@ -551,34 +522,27 @@ export class PieceMap {
     }
     return null;
   }
-  
-  /**
-   * Point in polygon test
-   */
+
   pointInPolygon(x, y, points) {
     let inside = false;
     for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
       const xi = points[i].x, yi = points[i].y;
       const xj = points[j].x, yj = points[j].y;
-      const intersect = ((yi > y) !== (yj > y)) &&
-                       (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
     }
     return inside;
   }
-  
-  /**
-   * Hit test em pontos de controlo
-   */
+
   hitTestControlPoint(screenX, screenY) {
     if (!this.selectedRegionId) return null;
-    
+
     const region = this.regions.get(this.selectedRegionId);
     if (!region) return null;
-    
+
     const localPos = this.screenToCharacterLocal(screenX, screenY);
     const threshold = this.controlPointRadius / this.renderer.viewportScale;
-    
+
     for (let i = 0; i < region.points.length; i++) {
       const pt = region.points[i];
       const dx = pt.x - localPos.x;
@@ -589,9 +553,33 @@ export class PieceMap {
     }
     return null;
   }
-  
+
   /**
-   * Seleciona uma região
+   * Atualiza estado de hover nas regioes
+   * Chamado durante movimento do rato no modo Mapa de Peças
+   */
+  updateHover(screenX, screenY) {
+    if (!this.renderer) return null;
+
+    const hitRegionId = this.hitTestRegion(screenX, screenY);
+
+    if (this.hoveredRegionId !== hitRegionId) {
+      if (this.hoveredRegionId) {
+        const prev = this.regions.get(this.hoveredRegionId);
+        if (prev) prev.hovered = false;
+      }
+      this.hoveredRegionId = hitRegionId;
+      if (hitRegionId) {
+        const region = this.regions.get(hitRegionId);
+        if (region) region.hovered = true;
+      }
+    }
+
+    return hitRegionId;
+  }
+
+  /**
+   * Seleciona uma região pelo ID
    */
   selectRegion(regionId) {
     if (this.selectedRegionId === regionId) return;
@@ -612,29 +600,7 @@ export class PieceMap {
       this.onSelectionChange(region);
     }
   }
-  
-  /**
-   * Atualiza hover
-   */
-  updateHover(screenX, screenY) {
-    const hit = this.hitTestRegion(screenX, screenY);
-    
-    if (this.hoveredRegionId !== hit) {
-      if (this.hoveredRegionId) {
-        const prev = this.regions.get(this.hoveredRegionId);
-        if (prev) prev.hovered = false;
-      }
-      this.hoveredRegionId = hit;
-      if (hit) {
-        const region = this.regions.get(hit);
-        if (region) region.hovered = true;
-      }
-    }
-  }
-  
-  /**
-   * Inicia arraste de ponto de controlo
-   */
+
   startDragPoint(screenX, screenY) {
     const hit = this.hitTestControlPoint(screenX, screenY);
     if (hit) {
@@ -645,52 +611,42 @@ export class PieceMap {
     }
     return false;
   }
-  
-  /**
-   * Arrasta ponto de controlo
-   */
+
   dragPoint(screenX, screenY) {
     if (!this.isEditing || this.draggedRegionId === null || this.draggedPointIndex < 0) return;
-    
+
     const region = this.regions.get(this.draggedRegionId);
     if (!region) return;
-    
+
     const localPos = this.screenToCharacterLocal(screenX, screenY);
     region.points[this.draggedPointIndex] = { x: localPos.x, y: localPos.y };
-    
+
     if (this.onRegionChange) {
       this.onRegionChange(region);
     }
   }
-  
-  /**
-   * Termina arraste
-   */
+
   endDragPoint() {
     this.isEditing = false;
     this.draggedRegionId = null;
     this.draggedPointIndex = -1;
   }
-  
+
   /**
-   * Gera máscara para uma região (para criar Part real)
+   * Gera mascara para uma regiao (para criar Part real)
    */
   generateMask(regionId) {
     const region = this.regions.get(regionId);
     if (!region) return null;
-    
-    // Converte pontos para formato de máscara poligonal
-    // Coordenadas já estão em espaço local do personagem (centro da imagem = 0,0)
-    // Precisa converter para coordenadas da imagem original (topo-esquerdo = 0,0)
+
     const imgCenterX = this.characterObject.imageWidth / 2;
     const imgCenterY = this.characterObject.imageHeight / 2;
-    
+
     const points = region.points.map(p => ({
       x: p.x + imgCenterX,
       y: p.y + imgCenterY
     }));
-    
-    // Calcula bounds
+
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const pt of points) {
       minX = Math.min(minX, pt.x);
@@ -698,64 +654,84 @@ export class PieceMap {
       maxX = Math.max(maxX, pt.x);
       maxY = Math.max(maxY, pt.y);
     }
-    
+
     return {
       type: 'polygon',
       points: points,
       bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
     };
   }
-  
+
   /**
-   * Calcula pivô na articulação do osso (joint do próprio osso)
-   * Para o antebraço, o pivô deve estar no cotovelo (próprio osso), não no pai
+   * Calcula pivo na articulacao do osso (joint do proprio osso)
+   * Para o antebraco, o pivo deve estar no cotovelo (proprio osso), nao no pai
+   * O pivo é expresso em coordenadas relativas à textura da peça (0-1)
    */
   calculatePivot(regionId) {
     const region = this.regions.get(regionId);
     if (!region) return { x: 0.5, y: 0.5 };
-    
+
     const bone = this.rig.getBone(region.boneId);
     if (!bone) return { x: 0.5, y: 0.5 };
-    
-    // A articulação está na posição mundial do PRÓPRIO osso (joint)
-    const jointWorld = bone.getWorldPoint();
+
     const imgCenterX = this.characterObject.imageWidth / 2;
     const imgCenterY = this.characterObject.imageHeight / 2;
-    
-    // Joint position in character-local coordinates (center origin)
-    const jointLocalX = jointWorld.x - imgCenterX;
-    const jointLocalY = jointWorld.y - imgCenterY;
-    
-    // Converte para coordenadas relativas ao bounds da máscara
-    // mask.bounds está em coordenadas da imagem (origem topo-esquerda)
-    // jointLocal está em coordenadas do personagem (origem no centro)
+
+    // 1. Obtém a máscara da região
     const mask = this.generateMask(regionId);
     if (!mask) return { x: 0.5, y: 0.5 };
+
+    // 1. Centro da peça em coordenadas da imagem
+    const pieceCenterImgX = mask.bounds.x + mask.bounds.width / 2;
+    const pieceCenterImgY = mask.bounds.y + mask.bounds.height / 2;
+
+    // 2. Centro da peça em coordenadas locais do personagem
+    const pieceCenterCharX = pieceCenterImgX - imgCenterX;
+    const pieceCenterCharY = pieceCenterImgY - imgCenterY;
+
+    // 2. Converte para coordenadas mundiais
+    const charTransform = this.characterObject.transform;
+    const rigBaseTransform = this.rig?.baseTransform || createTransform();
+    const charRigTransform = new Transform2D();
+    charRigTransform.multiply(charTransform);
+    charRigTransform.multiply(rigBaseTransform);
+    const pieceCenterWorld = charRigTransform.transformPoint(pieceCenterCharX, pieceCenterCharY);
+
+    // 4. Posição da articulação em coordenadas mundiais
+    const jointWorld = bone.getWorldPoint();
+
+    // Converte a posição da articulação para coordenadas da imagem
+    const charRigInv = charRigTransform.getInverse();
+    const jointChar = charRigInv.transformPoint(jointWorld.x, jointWorld.y);
+    const jointImgX = jointChar.x + imgCenterX;
+    const jointImgY = jointChar.y + imgCenterY;
+
+    // Calcula pivot na textura da peça (coordenadas 0-1)
+    const texWidth = mask.bounds.width + 4;  // bounds.width + 2*margin
+    const texHeight = mask.bounds.height + 4; // bounds.height + 2*margin
     
-    // Converte jointLocal (centro da imagem) para coordenadas da imagem (topo-esquerda)
-    const imgCenterX = this.characterObject.imageWidth / 2;
-    const imgCenterY = this.characterObject.imageHeight / 2;
-    const jointImgX = jointLocalX + imgCenterX;
-    const jointImgY = jointLocalY + imgCenterY;
+    // Posição da articulação na textura (pixels a partir do canto superior esquerdo da textura)
+    const jointTexX = jointImgX - mask.bounds.x + 2; // +margin
+    const jointTexY = jointImgY - mask.bounds.y + 2; // +margin
     
-    const relX = (jointImgX - mask.bounds.x) / mask.bounds.width;
-    const relY = (jointImgY - mask.bounds.y) / mask.bounds.height;
-    
-    return { x: Math.max(0, Math.min(1, relX)), y: Math.max(0, Math.min(1, relY)) };
+    // Pivot em coordenadas normalizadas (0-1)
+    const pivotX = jointTexX / texWidth;
+    const pivotY = jointTexY / texHeight;
+
+    return { x: Math.max(0, Math.min(1, pivotX)), y: Math.max(0, Math.min(1, pivotY)) };
   }
-  
+
   /**
-   * Desenha todas as regiões
+   * Desenha todas as regioes
    */
   draw(ctx, viewport) {
     if (!this.characterObject) return;
-    
+
     ctx.save();
-    
-    // Transformação: viewport * characterTransform
+
     const charMatrix = this.characterObject.transform.m;
     const viewportMatrix = viewport.m;
-    
+
     const combined = new Transform2D();
     combined.setMatrix(
       viewportMatrix[0] * charMatrix[0] + viewportMatrix[2] * charMatrix[1],
@@ -765,32 +741,29 @@ export class PieceMap {
       viewportMatrix[0] * charMatrix[4] + viewportMatrix[2] * charMatrix[5] + viewportMatrix[4],
       viewportMatrix[1] * charMatrix[4] + viewportMatrix[3] * charMatrix[5] + viewportMatrix[5]
     );
-    
+
     ctx.transform(
       combined.m[0], combined.m[1],
       combined.m[2], combined.m[3],
       combined.m[4], combined.m[5]
     );
-    
-    // Desenha cada região
+
     for (const region of this.regions.values()) {
       if (!region.visible) continue;
-      
       this.drawRegion(ctx, region);
     }
-    
+
     ctx.restore();
   }
-  
+
   /**
-   * Desenha uma região individual
+   * Desenha uma regiao individual
    */
   drawRegion(ctx, region) {
     if (region.points.length < 3) return;
-    
+
     ctx.save();
-    
-    // Preenchimento
+
     ctx.fillStyle = region.color;
     ctx.beginPath();
     ctx.moveTo(region.points[0].x, region.points[0].y);
@@ -799,11 +772,10 @@ export class PieceMap {
     }
     ctx.closePath();
     ctx.fill();
-    
-    // Contorno
+
     const isSelected = region.selected;
     const isHovered = region.hovered && !isSelected;
-    
+
     ctx.strokeStyle = isSelected ? '#ffcc00' : (isHovered ? '#ffffff' : 'rgba(255,255,255,0.6)');
     ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1);
     ctx.setLineDash(isSelected ? [8, 4] : []);
@@ -815,25 +787,23 @@ export class PieceMap {
     ctx.closePath();
     ctx.stroke();
     ctx.setLineDash([]);
-    
-    // Pontos de controlo se selecionada
+
     if (isSelected) {
       const radius = this.controlPointRadius / this.renderer.viewportScale;
       ctx.fillStyle = '#ffcc00';
       ctx.strokeStyle = '#ff8800';
       ctx.lineWidth = 2 / this.renderer.viewportScale;
-      
+
       for (const pt of region.points) {
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
-      
-      // Label com nome
+
       const centerX = region.points.reduce((sum, p) => sum + p.x, 0) / region.points.length;
       const centerY = region.points.reduce((sum, p) => sum + p.y, 0) / region.points.length;
-      
+
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 3;
@@ -843,12 +813,12 @@ export class PieceMap {
       ctx.strokeText(region.name, centerX, centerY);
       ctx.fillText(region.name, centerX, centerY);
     }
-    
+
     ctx.restore();
   }
-  
+
   /**
-   * Serialização para JSON
+   * Serializacao para JSON
    */
   toJSON() {
     const regionsData = {};
@@ -867,7 +837,7 @@ export class PieceMap {
       selectedRegionId: this.selectedRegionId
     };
   }
-  
+
   /**
    * Carrega de JSON
    */
@@ -891,27 +861,16 @@ export class PieceMap {
     }
     return map;
   }
-  
-  /**
-   * Obtém região por ID
-   */
+
   getRegion(regionId) {
     return this.regions.get(regionId);
   }
-  
-  /**
-   * Obtém todas as regiões
-   */
+
   getAllRegions() {
     return Array.from(this.regions.values());
   }
-  
-  /**
-   * Obtém região selecionada
-   */
+
   getSelectedRegion() {
     return this.selectedRegionId ? this.regions.get(this.selectedRegionId) : null;
   }
 }
-
-export { PieceMap };

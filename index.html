@@ -75,6 +75,13 @@
           </svg>
           Mapa de Peças
         </button>
+        <button id="btn-edit-parts" class="btn" title="Editar Peças" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5a2.121 2.121 0 0 1 3 3z"></path>
+          </svg>
+          Editar Peças
+        </button>
         <button id="btn-exit-rigging" class="btn" title="Sair Modo Armadura" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -82,7 +89,7 @@
           </svg>
           Sair Armadura
         </button>
-        <input type="file" id="file-import-png" accept="image/png" style="display: none;">
+        <input type="file" id="file-import-png" accept="image/png" style="position: absolute; left: -9999px; opacity: 0; pointer-events: none;">
       </div>
     </header>
 
@@ -115,7 +122,197 @@
           <div id="no-selection" class="no-selection">
             <p>Selecione uma imagem para editar as propriedades.</p>
           </div>
-          <div id="properties-form" class="properties-form hidden">
+          
+          <!-- Barra fixa do Mapa de Peças (sempre visível no modo Mapa de Peças) -->
+          <div id="piece-map-toolbar" class="piece-map-toolbar hidden">
+            <div class="toolbar-group">
+              <button id="btn-preview-piece" class="btn btn-secondary" title="Pré-visualizar Peça">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="20" rx="2"></rect>
+                  <path d="M6 6h12v12H6z"></path>
+                  <path d="M10 6v12"></path>
+                  <path d="M14 6v12"></path>
+                  <path d="M6 10h12"></path>
+                  <path d="M6 14h12"></path>
+                </svg>
+                <span>Pré-visualizar</span>
+              </button>
+              <button id="btn-generate-piece" class="btn btn-primary" title="Gerar Peça Real" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                <span>Gerar Peça</span>
+              </button>
+              <button id="btn-exit-piece-map" class="btn btn-secondary" title="Sair Mapa de Peças (Esc)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                <span>Sair</span>
+              </button>
+            </div>
+            
+            <!-- Controlo Testar Movimento (aparece quando há peças criadas) -->
+            <div id="test-movement-controls" class="test-movement-controls hidden">
+              <label class="test-movement-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                </svg>
+                Testar Movimento
+              </label>
+              <div class="test-movement-slider-container">
+                <input type="range" id="test-movement-slider" min="-60" max="60" value="0" step="1">
+                <span id="test-movement-value" class="test-movement-value">0°</span>
+              </div>
+              <button id="btn-reset-test-movement" class="btn btn-secondary btn-sm" title="Repor para 0°">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                </svg>
+              </button>
+            </div>
+            
+            <div class="toolbar-info">
+              <span id="piece-map-status">Nenhuma peça criada</span>
+              <span id="piece-count" class="piece-count">0 peças</span>
+            </div>
+          </div>
+          
+          <!-- Barra fixa do Editor de Peças (sempre visível no modo Editar Peças) -->
+          <div id="edit-parts-toolbar" class="edit-parts-toolbar hidden">
+            <div class="toolbar-group">
+              <button id="btn-select-part" class="btn btn-secondary" title="Selecionar Peça">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 3h18v18H3z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <span>Selecionar</span>
+              </button>
+              <button id="btn-move-part" class="btn btn-secondary" title="Mover Peça" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+                  <path d="M6 11V6a2 2 0 0 1 2-2v0a2 2 0 0 1 2 2v0"></path>
+                  <path d="M2 15h3"></path>
+                  <path d="M19 15h3"></path>
+                  <path d="M2 12h3"></path>
+                  <path d="M19 12h3"></path>
+                  <line x1="2" y1="18" x2="22" y2="18"></line>
+                </svg>
+                <span>Mover</span>
+              </button>
+              <button id="btn-edit-pivot" class="btn btn-secondary" title="Editar Pivô" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="2" x2="12" y2="22"></line>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                </svg>
+                <span>Pivô</span>
+              </button>
+              <button id="btn-exit-edit-parts" class="btn btn-secondary" title="Sair Editar Peças (Esc)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                <span>Sair</span>
+              </button>
+            </div>
+            
+            <div class="toolbar-info">
+              <span id="edit-parts-status">Nenhuma peça selecionada</span>
+              <span id="edit-parts-count" class="piece-count">0 peças</span>
+            </div>
+          </div>
+          
+          <!-- Painel do Editor de Peças -->
+          <div id="edit-parts-panel" class="edit-parts-panel hidden">
+            <div class="edit-parts-header">
+              <h3>Peças Recortadas</h3>
+              <span id="edit-parts-total" class="badge">0</span>
+            </div>
+            <ul id="parts-list" class="parts-list"></ul>
+          </div>
+          
+          <!-- Painel de propriedades da peça selecionada -->
+          <div id="part-properties-form" class="properties-form hidden">
+            <div class="form-group">
+              <label for="part-prop-name">Nome</label>
+              <input type="text" id="part-prop-name" readonly>
+            </div>
+            <div class="form-group">
+              <label for="part-prop-bone">Osso</label>
+              <output id="part-prop-bone">—</output>
+            </div>
+            <div class="form-group">
+              <label for="part-prop-pivot">Pivô</label>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="part-prop-pivot-x">X</label>
+                  <input type="number" id="part-prop-pivot-x" step="0.01" min="0" max="1" value="0.5">
+                </div>
+                <div class="form-group">
+                  <label for="part-prop-pivot-y">Y</label>
+                  <input type="number" id="part-prop-pivot-y" step="0.01" min="0" max="1" value="0.5">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="part-prop-visible">Visível</label>
+              <input type="checkbox" id="part-prop-visible" checked>
+            </div>
+            
+            <div class="form-group">
+              <label>Posição Local</label>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="part-prop-x">X</label>
+                  <input type="number" id="part-prop-x" step="0.1">
+                </div>
+                <div class="form-group">
+                  <label for="part-prop-y">Y</label>
+                  <input type="number" id="part-prop-y" step="0.1">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="part-prop-rotation">Rotação Local (graus)</label>
+              <div class="form-row" style="align-items: center; gap: 8px;">
+                <input type="number" id="part-prop-rotation" step="1" min="-180" max="180" value="0" style="width: 80px;">
+                <input type="range" id="part-prop-rotation-slider" min="-180" max="180" value="0" style="flex: 1;">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="part-prop-scale-x">Escala X</label>
+                <input type="number" id="part-prop-scale-x" step="0.01" min="0.01" value="1" style="width: 80px;">
+              </div>
+              <div class="form-group">
+                <label for="part-prop-scale-y">Escala Y</label>
+                <input type="number" id="part-prop-scale-y" step="0.01" min="0.01" value="1" style="width: 80px;">
+              </div>
+            </div>
+            <div class="form-group">
+              <button id="btn-reset-part-adjustments" class="btn btn-secondary" title="Repor Ajustes">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                </svg>
+                Repor Ajustes
+              </button>
+              <button id="btn-delete-part" class="btn btn-danger" title="Eliminar Peça">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+                Eliminar Peça
+              </button>
+            </div>
+          </div>
+          
+          <!-- Painel de propriedades normal -->
             <div class="form-group">
               <label for="prop-name">Nome</label>
               <input type="text" id="prop-name" readonly>
@@ -195,6 +392,15 @@
                 </select>
               </div>
               
+              <!-- Rotação Local -->
+              <div class="form-group">
+                <label for="bone-prop-rotation">Rotação Local (graus)</label>
+                <div class="form-row" style="align-items: center; gap: 8px;">
+                  <input type="number" id="bone-prop-rotation" step="1" min="-90" max="90" value="0" style="width: 80px;">
+                  <input type="range" id="bone-prop-rotation-slider" min="-90" max="90" value="0" style="flex: 1;">
+                </div>
+              </div>
+              
               <!-- Botões de ação -->
               <div class="rigging-actions">
                 <button id="btn-reset-rig" class="btn btn-secondary" title="Repor para sugestão automática">
@@ -220,6 +426,13 @@
                   </svg>
                   Mostrar Nomes
                 </button>
+                <button id="btn-reset-bone-rotation" class="btn btn-secondary" title="Repor Rotação (0°)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                  </svg>
+                  Repor Rotação
+                </button>
               </div>
               
               <!-- Botões de recorte (visíveis apenas no modo de recorte) -->
@@ -239,38 +452,7 @@
                 </button>
               </div>
               
-              <!-- Botões do Mapa de Peças (visíveis apenas no modo Mapa de Peças) -->
-              <div id="piece-map-actions" class="rigging-actions hidden">
-                <button id="btn-preview-piece" class="btn btn-secondary" title="Pré-visualizar Peça">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="2" width="20" height="20" rx="2"></rect>
-                    <path d="M6 6h12v12H6z"></path>
-                    <path d="M10 6v12"></path>
-                    <path d="M14 6v12"></path>
-                    <path d="M6 10h12"></path>
-                    <path d="M6 14h12"></path>
-                  </svg>
-                  Pré-visualizar
-                </button>
-                <button id="btn-generate-piece" class="btn btn-primary" title="Gerar Peça Real">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                  Gerar Peça
-                </button>
-                <button id="btn-exit-piece-map" class="btn btn-secondary" title="Sair Mapa de Peças (Esc)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                  Sair
-                </button>
-              </div>
-            </div>
-            
-            <!-- Hierarquia da armadura -->
+              <!-- Hierarquia da armadura -->
             <div class="rig-hierarchy-section">
               <h3>Hierarquia</h3>
               <ul id="rig-hierarchy-list" class="rig-hierarchy-list"></ul>

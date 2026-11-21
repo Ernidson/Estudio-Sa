@@ -41,7 +41,12 @@ const app = {
   
   // Mapa de Peças (Fase 2B.1)
   pieceMap: null,
-  isPieceMapMode: false
+  isPieceMapMode: false,
+  
+  // Editor de Peças (Fase 2B.3)
+  isEditPartsMode: false,
+  editPartsSelectedPartId: null,
+  editPartsTool: 'select'
 };
 
 /**
@@ -123,6 +128,12 @@ async function init() {
     app.renderer.rigRenderer,
     app.renderer
   );
+  
+  // Callback quando uma peça é criada
+  app.partManager.onPartCreated = function(part) {
+    updatePartsPanel();
+    updatePieceCountDisplay();
+  };
   
   app.partRenderer = new PartRenderer(app.renderer);
   
@@ -317,7 +328,27 @@ function setupEventListeners() {
   document.getElementById('btn-piece-map').addEventListener('click', togglePieceMapMode);
   document.getElementById('btn-generate-piece').addEventListener('click', generatePieceFromMap);
   document.getElementById('btn-exit-piece-map').addEventListener('click', exitPieceMapMode);
-  document.getElementById('btn-preview-piece').addEventListener('click', previewPieceFromMap);
+  document.getElementById('btn-preview-piece').addEventListener('click', () => previewPieceFromMap());
+  
+  // Editor de Peças (Fase 2B.3)
+  document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  document.getElementById('btn-select-part').addEventListener('click', () => setEditPartsTool('select'));
+  document.getElementById('btn-move-part').addEventListener('click', () => setEditPartsTool('move'));
+  document.getElementById('btn-edit-pivot').addEventListener('click', () => setEditPartsTool('pivot'));
+  document.getElementById('btn-exit-edit-parts').addEventListener('click', exitEditPartsMode);
+  document.getElementById('btn-reset-part-adjustments').addEventListener('click', resetPartAdjustments);
+  document.getElementById('btn-delete-part').addEventListener('click', deleteSelectedPart);
+
+  // Testar Movimento controls
+  const testMovementSlider = document.getElementById('test-movement-slider');
+  if (testMovementSlider) {
+    testMovementSlider.addEventListener('input', onTestMovementChange);
+    testMovementSlider.addEventListener('change', onTestMovementChange);
+  }
+  const btnResetTestMovement = document.getElementById('btn-reset-test-movement');
+  if (btnResetTestMovement) {
+    btnResetTestMovement.addEventListener('click', resetTestMovement);
+  }
 
   // Keyboard shortcuts
   document.addEventListener('keydown', onKeyDown);
@@ -367,6 +398,20 @@ function onMouseDown(e) {
     }
   }
 
+  // Modo Editar Peças: seleção e arraste de peças
+  if (app.isEditPartsMode && app.partManager) {
+    // Tenta selecionar peça
+    const hitPart = app.partRenderer.hitTestPart(app.partManager, app.currentCharacterObject, x, y);
+    if (hitPart) {
+      app.editPartsSelectedPartId = hitPart.id;
+      app.partManager.selectPart(hitPart.id);
+      updateEditPartsPanel(hitPart);
+      updatePartPropertiesPanel(hitPart);
+      e.preventDefault();
+      return;
+    }
+  }
+
   // Modo rigging: delega para rig editor
   if (app.isRiggingMode && app.rigEditor) {
     const handled = app.rigEditor.handleMouseDown(x, y);
@@ -404,6 +449,47 @@ function onMouseMove(e) {
     updateCanvasInfo(x, y);
     // Atualiza botão de confirmar enquanto desenha
     updateCuttingConfirmButton();
+    return;
+  }
+
+  // Mapa de Peças: arraste de pontos e hover
+  if (app.isPieceMapMode && app.pieceMap) {
+    if (app.pieceMap.isEditing) {
+      app.pieceMap.dragPoint(x, y);
+    } else {
+      app.pieceMap.updateHover(x, y);
+    }
+    updateCanvasInfo(x, y);
+    return;
+  }
+
+  // Modo Editar Peças: arraste de peça
+  if (app.isEditPartsMode && app.partManager && app.isMouseDown && app.editPartsSelectedPartId) {
+    const part = app.partManager.getPart(app.editPartsSelectedPartId);
+    if (part && app.editPartsTool === 'move') {
+      // Converte coordenadas de ecrã para coordenadas locais do osso
+      const viewportInv = app.renderer.viewport.getInverse();
+      const worldPos = viewportInv.transformPoint(x, y);
+      const charInv = app.currentCharacterObject.transform.getInverse();
+      const charLocal = charInv.transformPoint(worldPos.x, worldPos.y);
+      
+      // Inverte baseTransform do rig
+      const rig = app.partManager.rig;
+      const baseInv = rig.baseTransform.getInverse();
+      const rigLocal = baseInv.transformPoint(charLocal.x, charLocal.y);
+      
+      // Inverte worldTransform do bone
+      const bone = rig.getBone(app.editPartsSelectedPartId);
+      if (bone && bone.worldTransform) {
+        const boneInv = bone.worldTransform.getInverse();
+        const boneLocal = boneInv.transformPoint(rigLocal.x, rigLocal.y);
+        
+        // Atualiza posição local da peça
+        part.setLocalPosition(boneLocal.x, boneLocal.y);
+        app.renderer.render(app.scene);
+      }
+    }
+    updateCanvasInfo(x, y);
     return;
   }
 
@@ -470,6 +556,13 @@ function onMouseUp(e) {
     }
     app.isMouseDown = false;
     app.canvas.style.cursor = 'crosshair';
+    return;
+  }
+
+  // Modo Editar Peças: finaliza arraste de peça
+  if (app.isEditPartsMode) {
+    app.isMouseDown = false;
+    app.canvas.style.cursor = 'default';
     return;
   }
 
@@ -828,6 +921,13 @@ function enterRiggingMode(characterObject) {
   // Configura PartManager se houver peças
   if (characterObject.partManager) {
     characterObject.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
+    
+    // Callback quando uma peça é criada
+    characterObject.partManager.onPartCreated = function(part) {
+      updatePartsPanel();
+      updatePieceCountDisplay();
+    };
+    
     app.partManager = characterObject.partManager;
   }
   
@@ -855,6 +955,11 @@ function exitRiggingMode() {
   // Se estiver em modo de recorte, cancela primeiro
   if (app.isCuttingMode) {
     exitCuttingMode();
+  }
+  
+  // Garante que Mapa de Peças também está desativado
+  if (app.isPieceMapMode) {
+    exitPieceMapMode();
   }
   
   app.isRiggingMode = false;
@@ -890,6 +995,8 @@ function updateRiggingModeUI(enabled) {
   const exitBtn = document.getElementById('btn-exit-rigging');
   const cutBtn = document.getElementById('btn-cut-piece');
   const pieceMapBtn = document.getElementById('btn-piece-map');
+  const pieceMapToolbar = document.getElementById('piece-map-toolbar');
+  const testMovementControls = document.getElementById('test-movement-controls');
   
   if (prepareBtn) {
     prepareBtn.style.display = enabled ? 'none' : 'inline-flex';
@@ -906,6 +1013,9 @@ function updateRiggingModeUI(enabled) {
   if (pieceMapBtn) {
     pieceMapBtn.style.display = enabled ? 'inline-flex' : 'none';
   }
+  // Esconde toolbar do Mapa de Peças no modo rigging
+  if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+  if (testMovementControls) testMovementControls.classList.add('hidden');
   
   // Atualiza título do painel de propriedades
   const propsTitle = document.querySelector('.panel-right .panel-header h2');
@@ -925,6 +1035,11 @@ function enterCuttingMode() {
     return;
   }
   
+  // Garante que modo Mapa de Peças está desativado
+  if (app.isPieceMapMode) {
+    exitPieceMapMode();
+  }
+  
   // Encontra o osso do antebraço esquerdo
   const forearmBone = findLeftForearmBone(obj.rig);
   if (!forearmBone) {
@@ -940,6 +1055,13 @@ function enterCuttingMode() {
   } else {
     partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   }
+  
+  // Callback quando uma peça é criada
+  partManager.onPartCreated = function(part) {
+    updatePartsPanel();
+    updatePieceCountDisplay();
+  };
+  
   app.partManager = partManager;
   
   // Mostra botão de recortar
@@ -1025,6 +1147,8 @@ function updateCuttingModeUI(enabled) {
   const prepareBtn = document.getElementById('btn-prepare-character');
   const exitBtn = document.getElementById('btn-exit-rigging');
   const cuttingActions = document.getElementById('cutting-actions');
+  const pieceMapToolbar = document.getElementById('piece-map-toolbar');
+  const testMovementControls = document.getElementById('test-movement-controls');
   
   if (enabled) {
     // Modo de recorte ativo: esconde botões de rigging, mostra ações de recorte
@@ -1032,6 +1156,9 @@ function updateCuttingModeUI(enabled) {
     if (prepareBtn) prepareBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'none';
     if (cuttingActions) cuttingActions.classList.remove('hidden');
+    // Esconde toolbar do Mapa de Peças no modo recorte
+    if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
     
     const propsTitle = document.querySelector('.panel-right .panel-header h2');
     if (propsTitle) propsTitle.textContent = 'RECORTAR PEÇA';
@@ -1039,7 +1166,7 @@ function updateCuttingModeUI(enabled) {
     // Atualiza botão de confirmar
     updateCuttingConfirmButton();
   } else {
-    // Saiu do modo recorte: restaura UI de rigging (botão Recortar Peça permanece visível)
+    // Saiu do modo recorte: restaura UI de rigging
     if (cutBtn) cutBtn.style.display = 'inline-flex';
     if (prepareBtn) prepareBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'inline-flex';
@@ -1063,6 +1190,11 @@ function exitCuttingMode() {
   updateCuttingModeUI(false);
   updateStatus('Modo Recorte desativado');
   app.canvas.style.cursor = 'crosshair';
+  
+  // Garante que Mapa de Peças também está desativado
+  if (app.isPieceMapMode) {
+    exitPieceMapMode();
+  }
   
   // Restaura painel de rigging
   showRiggingPanel();
@@ -1149,6 +1281,11 @@ function enterPieceMapMode() {
     return;
   }
   
+  // Garante que modo de recorte antigo está desativado
+  if (app.isCuttingMode) {
+    exitCuttingMode();
+  }
+  
   // Cria ou reutiliza PieceMap (persistido no objeto do personagem)
   if (!obj.pieceMap) {
     obj.pieceMap = new PieceMap(obj, obj.rig, app.renderer);
@@ -1209,25 +1346,28 @@ function updatePieceMapModeUI(enabled) {
   const prepareBtn = document.getElementById('btn-prepare-character');
   const exitBtn = document.getElementById('btn-exit-rigging');
   const cutBtn = document.getElementById('btn-cut-piece');
-  const pieceMapActions = document.getElementById('piece-map-actions');
+  const pieceMapToolbar = document.getElementById('piece-map-toolbar');
+  const testMovementControls = document.getElementById('test-movement-controls');
+  const propsTitle = document.querySelector('.panel-right .panel-header h2');
   
   if (enabled) {
     if (pieceMapBtn) pieceMapBtn.style.display = 'inline-flex';
     if (prepareBtn) prepareBtn.style.display = 'none';
     if (exitBtn) exitBtn.style.display = 'none';
     if (cutBtn) cutBtn.style.display = 'none';
-    if (pieceMapActions) pieceMapActions.classList.remove('hidden');
+    if (pieceMapToolbar) pieceMapToolbar.classList.remove('hidden');
+    // Test movement controls start hidden, shown when pieces exist
+    if (testMovementControls) testMovementControls.classList.add('hidden');
     
-    const propsTitle = document.querySelector('.panel-right .panel-header h2');
     if (propsTitle) propsTitle.textContent = 'MAPA DE PEÇAS';
   } else {
     if (pieceMapBtn) pieceMapBtn.style.display = 'none';
     if (prepareBtn) prepareBtn.style.display = 'inline-flex';
     if (exitBtn) exitBtn.style.display = 'inline-flex';
     if (cutBtn) cutBtn.style.display = 'inline-flex';
-    if (pieceMapActions) pieceMapActions.classList.add('hidden');
+    if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
     
-    const propsTitle = document.querySelector('.panel-right .panel-header h2');
     if (propsTitle) propsTitle.textContent = 'ARMADURA';
   }
 }
@@ -1244,6 +1384,25 @@ function onPieceMapSelectionChange(region) {
   
   // Atualiza painel lateral com info da região
   updatePieceMapPanel(region);
+  
+  // Habilita/desabilita botão Gerar Peça
+  const generateBtn = document.getElementById('btn-generate-piece');
+  if (generateBtn) {
+    generateBtn.disabled = !region;
+    if (!region) {
+      generateBtn.title = 'Selecione uma região primeiro';
+    } else if (region.boneId !== 'cotovelo_esquerdo') {
+      generateBtn.title = 'Apenas cotovelo_esquerdo é suportado nesta fase';
+    } else {
+      generateBtn.title = 'Gerar Peça Real';
+    }
+  }
+  
+  // Habilita/desabilita botão Pré-visualizar
+  const previewBtn = document.getElementById('btn-preview-piece');
+  if (previewBtn) {
+    previewBtn.disabled = !region;
+  }
 }
 
 /**
@@ -1252,6 +1411,47 @@ function onPieceMapSelectionChange(region) {
 function onPieceMapRegionChange(region) {
   // Região foi modificada - pode atualizar preview se necessário
   console.log('Região modificada:', region.name);
+}
+
+/**
+ * Handler para mudança do slider de Testar Movimento
+ */
+function onTestMovementChange() {
+  const slider = document.getElementById('test-movement-slider');
+  const valueEl = document.getElementById('test-movement-value');
+  if (!slider || !valueEl) return;
+  
+  const angle = parseInt(slider.value, 10);
+  valueEl.textContent = `${angle}°`;
+  
+  // Aplica rotação ao cotovelo_esquerdo se existir
+  if (app.currentCharacterObject && app.currentCharacterObject.rig) {
+    const bone = app.currentCharacterObject.rig.getBone('cotovelo_esquerdo');
+    if (bone) {
+      bone.setLocalRotation(angle);
+      app.currentCharacterObject.rig.computeWorldTransforms();
+      app.renderer.render(app.scene);
+    }
+  }
+}
+
+/**
+ * Repor rotação do teste de movimento para 0°
+ */
+function resetTestMovement() {
+  const slider = document.getElementById('test-movement-slider');
+  const valueEl = document.getElementById('test-movement-value');
+  if (slider) slider.value = '0';
+  if (valueEl) valueEl.textContent = '0°';
+  
+  if (app.currentCharacterObject && app.currentCharacterObject.rig) {
+    const bone = app.currentCharacterObject.rig.getBone('cotovelo_esquerdo');
+    if (bone) {
+      bone.setLocalRotation(0);
+      app.currentCharacterObject.rig.computeWorldTransforms();
+      app.renderer.render(app.scene);
+    }
+  }
 }
 
 /**
@@ -1342,6 +1542,8 @@ function updatePieceMapPanel(selectedRegion) {
       const regionId = btn.dataset.regionId;
       const region = app.pieceMap.getRegion(regionId);
       if (region) {
+        // Seleciona a região antes de pré-visualizar
+        app.pieceMap.selectRegion(regionId);
         previewPieceFromMap(region);
       }
     });
@@ -1366,9 +1568,492 @@ function updatePieceMapPanel(selectedRegion) {
       selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
+
+/**
+ * Alterna modo Editar Peças
+ */
+function toggleEditPartsMode() {
+  if (app.isEditPartsMode) {
+    exitEditPartsMode();
+  } else {
+    enterEditPartsMode();
+  }
 }
 
 /**
+ * Entra no modo Editar Peças
+ */
+function enterEditPartsMode() {
+  const obj = app.selectionManager.getSelectedObject();
+  
+  if (!obj || !obj.partManager || app.partManager.getAllParts().length === 0) {
+    alert('Não há peças para editar. Crie uma peça primeiro.');
+    return;
+  }
+  
+  // Garante que outros modos estão desativados
+  if (app.isPieceMapMode) {
+    exitPieceMapMode();
+  }
+  if (app.isCuttingMode) {
+    exitCuttingMode();
+  }
+  if (app.isRiggingMode) {
+    exitRiggingMode();
+  }
+  
+  app.isEditPartsMode = true;
+  app.partManager = obj.partManager;
+  
+  // Configura o PartRenderer para o PartManager atual
+  app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
+  
+  // Atualiza UI
+  updateEditPartsModeUI(true);
+  updateStatus('Editar Peças: selecione uma peça para ajustar');
+  
+  // Esconde painel de rigging
+  const riggingPanel = document.getElementById('rigging-panel');
+  if (riggingPanel) riggingPanel.classList.add('hidden');
+  
+  // Mostra painel de propriedades com lista de peças
+  showPartsPanel();
+  
+  // Atualiza lista de peças
+  updateEditPartsPanel();
+}
+
+/**
+ * Sai do modo Editar Peças
+ */
+function exitEditPartsMode() {
+  if (!app.isEditPartsMode) return;
+  
+  app.isEditPartsMode = false;
+  app.editPartsSelectedPartId = null;
+  app.editPartsTool = 'select';
+  
+  updateEditPartsModeUI(false);
+  updateStatus('Editar Peças desativado');
+  
+  // Restaura painel de rigging
+  showRiggingPanel();
+}
+
+/**
+ * Atualiza UI do modo Editar Peças
+ */
+function updateEditPartsModeUI(enabled) {
+  const editPartsBtn = document.getElementById('btn-edit-parts');
+  const prepareBtn = document.getElementById('btn-prepare-character');
+  const exitBtn = document.getElementById('btn-exit-rigging');
+  const cutBtn = document.getElementById('btn-cut-piece');
+  const pieceMapBtn = document.getElementById('btn-piece-map');
+  const editPartsToolbar = document.getElementById('edit-parts-toolbar');
+  const editPartsPanel = document.getElementById('edit-parts-panel');
+  const testMovementControls = document.getElementById('test-movement-controls');
+  const pieceMapToolbar = document.getElementById('piece-map-toolbar');
+  const propsTitle = document.querySelector('.panel-right .panel-header h2');
+  
+  if (enabled) {
+    if (editPartsBtn) editPartsBtn.style.display = 'inline-flex';
+    if (prepareBtn) prepareBtn.style.display = 'none';
+    if (exitBtn) exitBtn.style.display = 'none';
+    if (cutBtn) cutBtn.style.display = 'none';
+    if (pieceMapBtn) pieceMapBtn.style.display = 'none';
+    if (editPartsToolbar) editPartsToolbar.classList.remove('hidden');
+    if (editPartsPanel) editPartsPanel.classList.remove('hidden');
+    // Test movement controls start hidden, shown when piece selected
+    if (testMovementControls) testMovementControls.classList.add('hidden');
+    if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
+    
+    if (propsTitle) propsTitle.textContent = 'EDITAR PEÇAS';
+  } else {
+    if (editPartsBtn) editPartsBtn.style.display = 'none';
+    if (prepareBtn) prepareBtn.style.display = 'inline-flex';
+    if (exitBtn) exitBtn.style.display = 'inline-flex';
+    if (cutBtn) cutBtn.style.display = 'inline-flex';
+    if (pieceMapBtn) pieceMapBtn.style.display = 'inline-flex';
+    if (editPartsToolbar) editPartsToolbar.classList.add('hidden');
+    if (editPartsPanel) editPartsPanel.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
+    
+    if (propsTitle) propsTitle.textContent = 'ARMADURA';
+  }
+}
+
+/**
+ * Define a ferramenta ativa no modo Editar Peças
+ */
+function setEditPartsTool(tool) {
+  app.editPartsTool = tool;
+  
+  const selectBtn = document.getElementById('btn-select-part');
+  const moveBtn = document.getElementById('btn-move-part');
+  const pivotBtn = document.getElementById('btn-edit-pivot');
+  
+  // Atualiza estado visual dos botões
+  [selectBtn, moveBtn, pivotBtn].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
+  
+  if (tool === 'select' && selectBtn) selectBtn.classList.add('active');
+  if (tool === 'move' && moveBtn) moveBtn.classList.add('active');
+  if (tool === 'pivot' && pivotBtn) pivotBtn.classList.add('active');
+  
+  // Habilita/desabilita botões de ação baseados na seleção
+  const moveBtnEl = document.getElementById('btn-move-part');
+  const pivotBtnEl = document.getElementById('btn-edit-pivot');
+  const hasSelection = !!app.editPartsSelectedPartId;
+  
+  if (moveBtnEl) moveBtnEl.disabled = !hasSelection;
+  if (pivotBtnEl) pivotBtnEl.disabled = !hasSelection;
+}
+
+/**
+ * Atualiza painel do Editor de Peças
+ */
+function updateEditPartsPanel(selectedPart) {
+  if (!app.partManager) return;
+  
+  const propsForm = document.getElementById('properties-form');
+  const noSel = document.getElementById('no-selection');
+  const boneForm = document.getElementById('bone-properties-form');
+  const partForm = document.getElementById('part-properties-form');
+  
+  if (!propsForm) return;
+  
+  // Esconde formulários de bone e propriedades normais
+  if (boneForm) boneForm.classList.add('hidden');
+  if (propsForm) propsForm.classList.remove('hidden');
+  if (noSel) noSel.classList.add('hidden');
+  
+  // Limpa o formulário de propriedades
+  const existingPanel = document.getElementById('edit-parts-panel');
+  if (existingPanel) existingPanel.remove();
+  
+  // Cria painel do Editor de Peças
+  const panel = document.createElement('div');
+  panel.id = 'edit-parts-panel';
+  panel.style.cssText = 'font-family: Segoe UI, sans-serif;';
+  
+  const parts = app.partManager.getAllParts();
+  const selectedId = selectedPart ? selectedPart.id : (app.editPartsSelectedPartId || null);
+  
+  panel.innerHTML = `
+    <div class="edit-parts-header">
+      <h3 style="margin: 0 0 12px; color: #fff; font-size: 14px;">Peças Recortadas</h3>
+      <span style="font-size: 12px; color: #888;">${parts.length} peça${parts.length !== 1 ? 's' : ''}</span>
+    </div>
+    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; background: #1e1e1e;">
+      ${parts.map(p => `
+        <div class="part-list-item" data-part-id="${p.id}" 
+             style="display: flex; align-items: center; padding: 8px 12px; cursor: pointer; 
+                    border-bottom: 1px solid #333; transition: background 0.15s;
+                    ${p.id === selectedId ? 'background: #2a4a6a;' : ''}"
+             onmouseover="this.style.background='#2a3a4a'" 
+             onmouseout="this.style.background='${p.id === selectedId ? '#2a4a6a' : 'transparent'}'">
+          <div style="width: 14px; height: 14px; border-radius: 3px; margin-right: 10px; 
+                      background: ${p.color}; border: 1px solid ${p.color.replace('0.4', '0.8')}; flex-shrink: 0;"></div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="color: #fff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${p.name}
+            </div>
+            <div style="color: #888; font-size: 11px;">${p.boneId} • ${p.imageWidth}x${p.imageHeight}</div>
+          </div>
+          <button class="part-delete-btn" data-part-id="${p.id}" 
+                  style="padding: 4px 10px; font-size: 11px; background: #3a3a3a; color: #ff4444; 
+                         border: 1px solid #ff4444; border-radius: 3px; cursor: pointer; flex-shrink: 0;
+                         opacity: 0.8; transition: opacity 0.15s;"
+                  onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+            Eliminar
+          </button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  propsForm.appendChild(panel);
+  
+  // Event listeners para itens da lista
+  panel.querySelectorAll('.part-list-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('part-delete-btn')) return;
+      const partId = item.dataset.partId;
+      const part = app.partManager.getPart(partId);
+      if (part) {
+        app.editPartsSelectedPartId = partId;
+        app.partManager.selectPart(partId);
+        updateEditPartsPanel(part);
+        updatePartPropertiesPanel(part);
+      }
+    });
+  });
+  
+  // Botões de eliminar
+  panel.querySelectorAll('.part-delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const partId = btn.dataset.partId;
+      deletePart(partId);
+    });
+  });
+  
+  // Destaca item selecionado
+  if (selectedId) {
+    const selectedItem = panel.querySelector(`.part-list-item[data-part-id="${selectedId}"]`);
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+/**
+ * Atualiza painel de propriedades da peça selecionada
+ */
+function updatePartPropertiesPanel(part) {
+  if (!part) {
+    const partForm = document.getElementById('part-properties-form');
+    const noSel = document.getElementById('no-selection');
+    if (partForm) partForm.classList.add('hidden');
+    if (noSel) noSel.classList.remove('hidden');
+    return;
+  }
+  
+  const propsForm = document.getElementById('properties-form');
+  const noSel = document.getElementById('no-selection');
+  const boneForm = document.getElementById('bone-properties-form');
+  const partForm = document.getElementById('part-properties-form');
+  
+  if (!propsForm) return;
+  
+  // Esconde formulários de bone e propriedades normais
+  if (boneForm) boneForm.classList.add('hidden');
+  if (propsForm) propsForm.classList.remove('hidden');
+  if (noSel) noSel.classList.add('hidden');
+  
+  // Limpa o formulário de propriedades
+  const existingPanel = document.getElementById('part-properties-panel');
+  if (existingPanel) existingPanel.remove();
+  
+  // Cria painel de propriedades da peça
+  const panel = document.createElement('div');
+  panel.id = 'part-properties-panel';
+  panel.style.cssText = 'font-family: Segoe UI, sans-serif;';
+  
+  panel.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0 0 12px; color: #fff; font-size: 14px;">Propriedades da Peça</h3>
+    </div>
+    <div class="form-group">
+      <label for="part-prop-name">Nome</label>
+      <input type="text" id="part-prop-name" value="${part.name}" readonly>
+    </div>
+    <div class="form-group">
+      <label for="part-prop-bone">Osso</label>
+      <input type="text" id="part-prop-bone" value="${part.boneId}" readonly>
+    </div>
+    <div class="form-group">
+      <label for="part-prop-pivot">Pivô</label>
+      <div class="form-row" style="align-items: center; gap: 8px;">
+        <input type="number" id="part-prop-pivot-x" step="0.01" min="0" max="1" value="${part.pivot.x.toFixed(2)}" style="width: 80px;">
+        <input type="number" id="part-prop-pivot-y" step="0.01" min="0" max="1" value="${part.pivot.y.toFixed(2)}" style="width: 80px;">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="part-prop-visible">Visível</label>
+      <input type="checkbox" id="part-prop-visible" ${part.visible ? 'checked' : ''}>
+    </div>
+    
+    <div class="form-group">
+      <label>Posição Local</label>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="part-prop-x">X</label>
+          <input type="number" id="part-prop-x" step="0.1" value="${part.localPosition.x.toFixed(1)}">
+        </div>
+        <div class="form-group">
+          <label for="part-prop-y">Y</label>
+          <input type="number" id="part-prop-y" step="0.1" value="${part.localPosition.y.toFixed(1)}">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="part-prop-rotation">Rotação Local (graus)</label>
+      <div class="form-row" style="align-items: center; gap: 8px;">
+        <input type="number" id="part-prop-rotation" step="1" min="-180" max="180" value="${part.localRotation}" style="width: 80px;">
+        <input type="range" id="part-prop-rotation-slider" min="-180" max="180" value="${part.localRotation}" style="flex: 1;">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="part-prop-scale-x">Escala X</label>
+        <input type="number" id="part-prop-scale-x" step="0.01" min="0.01" value="${part.localScale.x.toFixed(2)}" style="width: 80px;">
+      </div>
+      <div class="form-group">
+        <label for="part-prop-scale-y">Escala Y</label>
+        <input type="number" id="part-prop-scale-y" step="0.01" min="0.01" value="${part.localScale.y.toFixed(2)}" style="width: 80px;">
+      </div>
+    </div>
+    <div class="form-group">
+      <button id="btn-reset-part-adjustments" class="btn btn-secondary" title="Repor Ajustes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+        </svg>
+        Repor Ajustes
+      </button>
+      <button id="btn-delete-part" class="btn btn-danger" title="Eliminar Peça">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+        Eliminar Peça
+      </button>
+    </div>
+  `;
+  
+  propsForm.appendChild(panel);
+  
+  // Event listeners
+  const pivotXInput = document.getElementById('part-prop-pivot-x');
+  const pivotYInput = document.getElementById('part-prop-pivot-y');
+  const xInput = document.getElementById('part-prop-x');
+  const yInput = document.getElementById('part-prop-y');
+  const rotationInput = document.getElementById('part-prop-rotation');
+  const rotationSlider = document.getElementById('part-prop-rotation-slider');
+  const scaleXInput = document.getElementById('part-prop-scale-x');
+  const scaleYInput = document.getElementById('part-prop-scale-y');
+  const visibleInput = document.getElementById('part-prop-visible');
+  const resetBtn = document.getElementById('btn-reset-part-adjustments');
+  const deleteBtn = document.getElementById('btn-delete-part');
+  
+  if (pivotXInput) {
+    pivotXInput.addEventListener('change', () => {
+      part.pivot.x = Math.max(0, Math.min(1, parseFloat(pivotXInput.value)));
+      part.updateLocalTransform();
+      app.renderer.render(app.scene);
+    });
+  }
+  if (pivotYInput) {
+    pivotYInput.addEventListener('change', () => {
+      part.pivot.y = Math.max(0, Math.min(1, parseFloat(pivotYInput.value)));
+      part.updateLocalTransform();
+      app.renderer.render(app.scene);
+    });
+  }
+  if (xInput) {
+    xInput.addEventListener('change', () => {
+      part.setLocalPosition(parseFloat(xInput.value), part.localPosition.y);
+      app.renderer.render(app.scene);
+    });
+  }
+  if (yInput) {
+    yInput.addEventListener('change', () => {
+      part.setLocalPosition(part.localPosition.x, parseFloat(yInput.value));
+      app.renderer.render(app.scene);
+    });
+  }
+  if (rotationInput && rotationSlider) {
+    const updateRotation = () => {
+      const angle = parseFloat(rotationInput.value);
+      rotationSlider.value = angle;
+      part.setLocalRotation(angle);
+      app.renderer.render(app.scene);
+    };
+    rotationInput.addEventListener('input', updateRotation);
+    rotationSlider.addEventListener('input', updateRotation);
+  }
+  if (scaleXInput) {
+    scaleXInput.addEventListener('change', () => {
+      part.setLocalScale(parseFloat(scaleXInput.value), part.localScale.y);
+      app.renderer.render(app.scene);
+    });
+  }
+  if (scaleYInput) {
+    scaleYInput.addEventListener('change', () => {
+      part.setLocalScale(part.localScale.x, parseFloat(scaleYInput.value));
+      app.renderer.render(app.scene);
+    });
+  }
+  if (visibleInput) {
+    visibleInput.addEventListener('change', () => {
+      part.visible = visibleInput.checked;
+      app.renderer.render(app.scene);
+    });
+  }
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      part.setLocalPosition(0, 0);
+      part.setLocalRotation(0);
+      part.setLocalScale(1, 1);
+      part.pivot = { x: 0.5, y: 0.5 };
+      updatePartPropertiesPanel(part);
+      app.renderer.render(app.scene);
+    });
+  }
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      if (confirm(`Eliminar a peça "${part.name}"?`)) {
+        deletePart(part.id);
+      }
+    });
+  }
+}
+
+/**
+ * Elimina uma peça
+ */
+function deletePart(partId) {
+  if (!app.partManager) return;
+  
+  const part = app.partManager.getPart(partId);
+  if (!part) return;
+  
+  if (confirm(`Eliminar a peça "${part.name}"?`)) {
+    app.partManager.removePart(partId);
+    
+    // Se a peça eliminada era a selecionada, limpa seleção
+    if (app.editPartsSelectedPartId === partId) {
+      app.editPartsSelectedPartId = null;
+    }
+    
+    updateEditPartsPanel();
+    updatePieceCountDisplay();
+    app.renderer.render(app.scene);
+  }
+}
+
+/**
+ * Repor ajustes da peça selecionada
+ */
+function resetPartAdjustments() {
+  if (!app.partManager || !app.editPartsSelectedPartId) return;
+  
+  const part = app.partManager.getPart(app.editPartsSelectedPartId);
+  if (!part) return;
+  
+  part.setLocalPosition(0, 0);
+  part.setLocalRotation(0);
+  part.setLocalScale(1, 1);
+  part.pivot = { x: 0.5, y: 0.5 };
+  
+  updatePartPropertiesPanel(part);
+  app.renderer.render(app.scene);
+}
+
+/**
+ * Elimina a peça selecionada
+ */
+function deleteSelectedPart() {
+  if (!app.editPartsSelectedPartId) return;
+  deletePart(app.editPartsSelectedPartId);
+}
+  
+  /**
  * Gera peça real a partir da região selecionada no Mapa de Peças
  */
 async function generatePieceFromMap() {
@@ -1408,6 +2093,13 @@ async function generatePieceFromMap() {
     } else {
       partManager.setReferences(app.renderer.rigRenderer, app.renderer);
     }
+    
+    // Callback quando uma peça é criada
+    partManager.onPartCreated = function(part) {
+      updatePartsPanel();
+      updatePieceCountDisplay();
+    };
+    
     app.partManager = partManager;
     
     // Cria a peça via PartManager
@@ -1437,11 +2129,18 @@ async function generatePieceFromMap() {
     // Sai do modo mapa de peças
     exitPieceMapMode();
     
+    // Garante que botão de recorte antigo fica oculto antes de entrar no rigging
+    const cutBtn = document.getElementById('btn-cut-piece');
+    if (cutBtn) cutBtn.style.display = 'none';
+    
     // Entra no modo rigging para testar movimento
     enterRiggingMode(obj);
     
     // Atualiza painel
     updatePartsPanel();
+    
+    // Atualiza contagem de peças
+    updatePieceCountDisplay();
     
   } catch (err) {
     console.error('Erro ao gerar peça:', err);
@@ -1454,6 +2153,11 @@ async function generatePieceFromMap() {
  */
 async function previewPieceFromMap(region) {
   if (!app.isPieceMapMode || !app.pieceMap) return;
+  
+  // Proteção contra chamada direta via event handler (MouseEvent)
+  if (region && typeof region === 'object' && 'target' in region && 'type' in region) {
+    region = null;
+  }
   
   if (!region) {
     region = app.pieceMap.getSelectedRegion();
@@ -1613,6 +2317,35 @@ function updatePartsPanel() {
 }
 
 /**
+ * Atualiza exibição do contador de peças criadas
+ */
+function updatePieceCountDisplay() {
+  const pieceCountEl = document.getElementById('piece-count');
+  const pieceStatusEl = document.getElementById('piece-map-status');
+  
+  if (!pieceCountEl) return;
+  
+  // Conta peças criadas no PartManager
+  let count = 0;
+  if (app.partManager) {
+    count = app.partManager.getAllParts().length;
+  }
+  
+  pieceCountEl.textContent = `${count} peça${count !== 1 ? 's' : ''}`;
+  
+  if (pieceStatusEl) {
+    if (count === 0) {
+      pieceStatusEl.textContent = 'Nenhuma peça criada';
+    } else {
+      pieceStatusEl.textContent = `${count} peça${count !== 1 ? 's' : ''} criada${count !== 1 ? 's' : ''} — Testar Movimento disponível`;
+      // Mostra controlo Testar Movimento
+      const testControls = document.getElementById('test-movement-controls');
+      if (testControls) testControls.classList.remove('hidden');
+    }
+  }
+}
+
+/**
  * Desenha preview do recorte durante o modo de recorte
  */
 function drawCuttingPreview() {
@@ -1729,4 +2462,6 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
 }

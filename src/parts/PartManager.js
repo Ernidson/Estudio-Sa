@@ -6,6 +6,7 @@
 
 import { Part, createPart } from './Part.js';
 import { generateId } from '../editor/ImageImporter.js';
+import { Transform2D, createTransform } from '../core/Transform2D.js';
 
 export class PartManager {
   constructor(characterObject, rig, rigRenderer, renderer) {
@@ -126,26 +127,55 @@ export class PartManager {
     // Converte para Data URL
     const imageData = canvas.toDataURL('image/png');
     
-    // Calcula posição local relativa à articulação do osso (joint do próprio osso)
-    // A posição da peça no espaço do personagem (centro da imagem = 0,0)
-    const pieceCenterX = bounds.x + bounds.width / 2;
-    const pieceCenterY = bounds.y + bounds.height / 2;
+    // Calcula o pivot correto para que a articulação (joint) coincida com o pivot na textura
+    // A posição local da peça deve ser (0,0) para que o pivot coincida com a articulação
     
-    // Converte para coordenadas locais do personagem (origem no centro da imagem)
+    // 1. Centro da peça em coordenadas da imagem (PNG)
+    const pieceCenterImgX = bounds.x + bounds.width / 2;
+    const pieceCenterImgY = bounds.y + bounds.height / 2;
+    
+    // 2. Centro da peça em coordenadas locais do personagem (origem no centro da imagem)
     const charCenterX = this.characterObject.imageWidth / 2;
     const charCenterY = this.characterObject.imageHeight / 2;
-    let localX = bounds.x + bounds.width / 2 - this.characterObject.imageWidth / 2;
-    let localY = bounds.y + bounds.height / 2 - this.characterObject.imageHeight / 2;
+    const pieceCenterCharX = pieceCenterImgX - charCenterX;
+    const pieceCenterCharY = pieceCenterImgY - charCenterY;
     
-    // Converte para coordenadas locais da articulação do osso (joint do próprio osso)
-    // A articulação está na posição mundial do PRÓPRIO osso
+    // 3. Converte para coordenadas mundiais
+    const charTransform = this.characterObject.transform;
+    const rigBaseTransform = this.rig?.baseTransform || createTransform();
+    const charRigTransform = new Transform2D();
+    charRigTransform.multiply(charTransform);
+    charRigTransform.multiply(rigBaseTransform);
+    const pieceCenterWorld = charRigTransform.transformPoint(pieceCenterCharX, pieceCenterCharY);
+    
+    // 4. Posição da articulação (joint) do osso em coordenadas mundiais
     const jointWorld = bone.getWorldPoint();
-    const jointLocalX = jointWorld.x - this.characterObject.imageWidth / 2;
-    const jointLocalY = jointWorld.y - this.characterObject.imageHeight / 2;
     
-    // Posição local relativa à articulação do osso
-    localX = localX - jointLocalX;
-    localY = localY - jointLocalY;
+    // 5. Converte a posição da articulação para coordenadas da imagem
+    // Inverte a transformação charRig para obter coordenadas locais do personagem
+    const charRigInv = charRigTransform.getInverse();
+    const jointChar = charRigInv.transformPoint(jointWorld.x, jointWorld.y);
+    const imgCenterX = this.characterObject.imageWidth / 2;
+    const imgCenterY = this.characterObject.imageHeight / 2;
+    const jointImgX = jointChar.x + charCenterX;
+    const jointImgY = jointChar.y + charCenterY;
+    
+    // 3. Calcula pivot na textura da peça (coordenadas 0-1)
+    // A textura tem margem de 2px em cada lado
+    const texWidth = bounds.width + 4;
+    const texHeight = bounds.height + 4;
+    
+    // Posição da articulação na textura (pixels a partir do canto superior esquerdo da textura)
+    const jointTexX = jointImgX - bounds.x + 2;
+    const jointTexY = jointImgY - bounds.y + 2;
+    
+    // Pivot em coordenadas normalizadas (0-1)
+    const pivotX = jointTexX / texWidth;
+    const pivotY = jointTexY / texHeight;
+    
+    // Posição local da peça: (0,0) para que o pivot coincida com a articulação do osso
+    const localX = 0;
+    const localY = 0;
     
     // Cria a peça
     const part = new Part({
@@ -154,7 +184,10 @@ export class PartManager {
       boneId,
       mask,
       localPosition: { x: localX, y: localY },
-      pivot: { x: 0.5, y: 0.5 }, // Centro da peça por padrão
+      pivot: { 
+        x: Math.max(0, Math.min(1, pivotX)), 
+        y: Math.max(0, Math.min(1, pivotY)) 
+      }, // Pivot calculado para alinhar articulação com textura
       zIndex: this.getNextZIndex()
     });
     

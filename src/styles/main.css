@@ -555,3 +555,378 @@ body {
 .top-bar-center .btn[style*="display: none"] {
   display: none !important;
 }
+
+/* ===== MAPA DE PEÇAS - TOOLBAR FIXA ===== */
+
+.piece-map-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.piece-map-toolbar.hidden {
+  display: none;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar-group .btn {
+  flex: 1;
+  min-width: 90px;
+  justify-content: center;
+}
+
+.toolbar-group .btn span {
+  display: none;
+}
+
+.toolbar-group .btn:hover span {
+  display: inline;
+}
+
+@media (min-width: 400px) {
+  .toolbar-group .btn span {
+    display: inline;
+  }
+}
+
+.test-movement-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(0, 122, 204, 0.1);
+  border: 1px solid var(--accent-blue);
+  border-radius: 6px;
+}
+
+.test-movement-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.test-movement-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.test-movement-slider-container input[type="range"] {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  outline: none;
+}
+
+.test-movement-slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  cursor: pointer;
+  border: 2px solid var(--bg-primary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease;
+}
+
+.test-movement-slider-container input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.test-movement-slider-container input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  cursor: pointer;
+  border: 2px solid var(--bg-primary);
+}
+
+.test-movement-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  min-width: 40px;
+  text-align: right;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.toolbar-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.piece-count {
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+/* When piece map mode is active, show toolbar and hide normal panels */
+.piece-map-mode-active .piece-map-toolbar {
+  display: flex;
+}
+
+.piece-map-mode-active #no-selection,
+.piece-map-mode-active #properties-form,
+.piece-map-mode-active #rigging-panel {
+  display: none;
+}
+
+/* ===== EDITOR DE PEÇAS - TOOLBAR FIXA ===== */
+
+.edit-parts-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.edit-parts-toolbar.hidden {
+  display: none;
+}
+
+.edit-parts-mode-active .edit-parts-toolbar {
+  display: flex;
+}
+
+.edit-parts-mode-active #no-selection,
+.edit-parts-mode-active #properties-form,
+.edit-parts-mode-active #rigging-panel,
+.edit-parts-mode-active #piece-map-toolbar,
+.edit-parts-mode-active #test-movement-controls {
+  display: none;
+}
+
+.edit-parts-mode-active #edit-parts-toolbar {
+  display: flex;
+}
+
+.edit-parts-mode-active #edit-parts-panel {
+  display: block;
+}
+
+/* Painel do Editor de Peças */
+.edit-parts-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.edit-parts-panel.hidden {
+  display: none;
+}
+
+.edit-parts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.edit-parts-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.badge {
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Lista de Peças */
+.parts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.part-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  margin-bottom: 4px;
+}
+
+.part-list-item:hover {
+  background: var(--bg-hover);
+}
+
+.part-list-item.selected {
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-blue);
+}
+
+.part-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+}
+
+.part-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.part-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.part-bone {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.part-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.part-actions .btn {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* Painel de propriedades da peça */
+#part-properties-form {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#part-properties-form .form-group {
+  margin-bottom: 12px;
+}
+
+#part-properties-form .form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+#part-properties-form .form-row {
+  display: flex;
+  gap: 8px;
+}
+
+#part-properties-form .form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+#part-properties-form input[type="number"],
+#part-properties-form output,
+#part-properties-form select {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#part-properties-form input[type="number"]:focus,
+#part-properties-form select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+#part-properties-form output {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+#part-properties-form input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+}
+
+#part-properties-form .btn-danger {
+  background: var(--bg-secondary);
+  color: #ff4444;
+  border: 1px solid #ff4444;
+}
+
+#part-properties-form .btn-danger:hover {
+  background: #ff4444;
+  color: var(--bg-primary);
+}
+
+#part-properties-form .btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}

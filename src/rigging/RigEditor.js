@@ -305,6 +305,13 @@ export class RigEditor {
     if (this.panelElements.boneParent) {
       this.panelElements.boneParent.addEventListener('change', () => this._onBoneParentChange());
     }
+    if (this.panelElements.boneRotation) {
+      this.panelElements.boneRotation.addEventListener('change', () => this._onBoneRotationChange());
+      this.panelElements.boneRotation.addEventListener('input', () => this._onBoneRotationChange());
+    }
+    if (this.panelElements.boneRotationSlider) {
+      this.panelElements.boneRotationSlider.addEventListener('input', () => this._onBoneRotationChange());
+    }
     if (this.panelElements.btnResetRig) {
       this.panelElements.btnResetRig.addEventListener('click', () => this.resetToPreset());
     }
@@ -313,6 +320,9 @@ export class RigEditor {
     }
     if (this.panelElements.btnToggleLabels) {
       this.panelElements.btnToggleLabels.addEventListener('click', () => this.toggleLabels());
+    }
+    if (this.panelElements.btnResetBoneRotation) {
+      this.panelElements.btnResetBoneRotation.addEventListener('click', () => this._onResetBoneRotation());
     }
   }
 
@@ -338,6 +348,55 @@ export class RigEditor {
     const y = parseFloat(this.panelElements.boneY?.value) || 0;
     
     bone.setLocalPosition(x, y);
+    this.rig.computeWorldTransforms();
+    this._updatePropertiesPanel();
+  }
+
+  /**
+   * Callback mudança rotação do bone
+   */
+  _onBoneRotationChange() {
+    const bone = this.rig?.getSelectedBone();
+    if (!bone) return;
+    
+    // Lê do input ou slider (qualquer um que disparou o evento)
+    const rotation = parseFloat(
+      this.panelElements.boneRotation?.value || 
+      this.panelElements.boneRotationSlider?.value || 
+      0
+    );
+    
+    bone.setLocalRotation(rotation);
+    
+    // Sincroniza input e slider
+    if (this.panelElements.boneRotation) {
+      this.panelElements.boneRotation.value = rotation.toFixed(1);
+    }
+    if (this.panelElements.boneRotationSlider) {
+      this.panelElements.boneRotationSlider.value = rotation.toFixed(1);
+    }
+    
+    this.rig.computeWorldTransforms();
+    this._updatePropertiesPanel();
+  }
+
+  /**
+   * Callback reset rotação do bone
+   */
+  _onResetBoneRotation() {
+    const bone = this.rig?.getSelectedBone();
+    if (!bone) return;
+    
+    bone.setLocalRotation(0);
+    
+    // Atualiza UI
+    if (this.panelElements.boneRotation) {
+      this.panelElements.boneRotation.value = '0';
+    }
+    if (this.panelElements.boneRotationSlider) {
+      this.panelElements.boneRotationSlider.value = '0';
+    }
+    
     this.rig.computeWorldTransforms();
     this._updatePropertiesPanel();
   }
@@ -393,10 +452,13 @@ export class RigEditor {
     
     const localPos = bone.getLocalPosition();
     const worldPos = bone.getWorldPoint();
+    const localRotation = bone.getLocalRotation();
     
     if (this.panelElements.boneName) this.panelElements.boneName.value = bone.name;
     if (this.panelElements.boneX) this.panelElements.boneX.value = localPos.x.toFixed(1);
     if (this.panelElements.boneY) this.panelElements.boneY.value = localPos.y.toFixed(1);
+    if (this.panelElements.boneRotation) this.panelElements.boneRotation.value = localRotation.toFixed(1);
+    if (this.panelElements.boneRotationSlider) this.panelElements.boneRotationSlider.value = localRotation.toFixed(1);
     if (this.panelElements.boneWorldX) this.panelElements.boneWorldX.textContent = worldPos.x.toFixed(1);
     if (this.panelElements.boneWorldY) this.panelElements.boneWorldY.textContent = worldPos.y.toFixed(1);
     if (this.panelElements.boneSide) this.panelElements.boneSide.textContent = bone.side;

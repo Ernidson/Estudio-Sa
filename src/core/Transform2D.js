@@ -177,6 +177,24 @@ export class Transform2D {
   }
 
   /**
+   * Aplica apenas a parte linear da transformação (rotação + escala) a um vetor
+   * Não aplica translação - usado para vetores de direção
+   */
+  transformVector(x, y, out = {}) {
+    out.x = this.m[0] * x + this.m[2] * y;
+    out.y = this.m[1] * x + this.m[3] * y;
+    return out;
+  }
+
+  /**
+   * Aplica a parte linear da transformação inversa a um vetor
+   */
+  inverseTransformVector(x, y, out = {}) {
+    const inv = this.getInverse();
+    return inv.transformVector(x, y, out);
+  }
+
+  /**
    * Decomposição da matriz em posição, rotação e escala
    * Retorna { x, y, rotation, scaleX, scaleY }
    */
