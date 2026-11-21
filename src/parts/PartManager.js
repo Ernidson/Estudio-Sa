@@ -62,7 +62,6 @@ export class PartManager {
       await this.characterObject.loadImage();
     }
     
-    const sourceImg = this.characterObject.imageElement;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
@@ -84,31 +83,23 @@ export class PartManager {
       throw new Error('Tipo de máscara não suportado');
     }
     
-    // Adiciona margem para não cortar exatamente na borda
+    // Cria canvas com tamanho do bounds + margem
     const margin = 2;
-    const sx = Math.max(0, bounds.x - margin);
-    const sy = Math.max(0, bounds.y - margin);
-    const sw = Math.min(this.characterObject.imageWidth - sx, bounds.width + margin * 2);
-    const sh = Math.min(this.characterObject.imageHeight - sy, bounds.height + margin * 2);
+    canvas.width = bounds.width + 4;  // margin * 2
+    canvas.height = bounds.height + 4;
     
-    // Desenha a região recortada
-    canvas.width = sw;
-    canvas.height = sh;
-    ctx.drawImage(
-      this.characterObject.imageElement,
-      sx, sy, sw, sh,
-      0, 0, sw, sh
-    );
-    
-    // Se máscara é polígono, aplica recorte adicional
+    // Para polígono: cria canvas transparente e aplica clip ANTES de desenhar
     if (mask.type === 'polygon') {
-      ctx.save();
-      // Ajusta coordenadas do polígono para o canvas recortado
-      const adjustedPoints = mask.points.map(pt => ({
-        x: pt.x - sx,
-        y: pt.y - sy
-      }));
+      // Calcula pontos ajustados para o canvas (com margem)
+      const adjustedPoints = [];
+      for (const pt of mask.points) {
+        adjustedPoints.push({
+          x: pt.x - bounds.x + 2,
+          y: pt.y - bounds.y + 2
+        });
+      }
       
+      // Aplica clip PRIMEIRO
       ctx.beginPath();
       ctx.moveTo(adjustedPoints[0].x, adjustedPoints[0].y);
       for (let i = 1; i < adjustedPoints.length; i++) {
@@ -116,13 +107,20 @@ export class PartManager {
       }
       ctx.closePath();
       ctx.clip();
-      // Redesenha a imagem original recortada no polígono
+      
+      // Desenha a imagem original recortada
       ctx.drawImage(
         this.characterObject.imageElement,
-        sx, sy, sw, sh,
-        0, 0, sw, sh
+        bounds.x, bounds.y, bounds.width, bounds.height,
+        2, 2, bounds.width, bounds.height  // offset by margin
       );
-      ctx.restore();
+    } else {
+      // Retângulo: desenha diretamente
+      ctx.drawImage(
+        this.characterObject.imageElement,
+        bounds.x, bounds.y, bounds.width, bounds.height,
+        2, 2, bounds.width, bounds.height  // offset by margin
+      )
     }
     
     // Converte para Data URL
@@ -136,8 +134,8 @@ export class PartManager {
     // Converte para coordenadas locais do personagem (origem no centro da imagem)
     const charCenterX = this.characterObject.imageWidth / 2;
     const charCenterY = this.characterObject.imageHeight / 2;
-    let localX = pieceCenterX - charCenterX;
-    let localY = pieceCenterY - charCenterY;
+    let localX = bounds.x + bounds.width / 2 - this.characterObject.imageWidth / 2;
+    let localY = bounds.y + bounds.height / 2 - this.characterObject.imageHeight / 2;
     
     // Converte para coordenadas locais da articulação do osso (joint do próprio osso)
     // A articulação está na posição mundial do PRÓPRIO osso

@@ -91,33 +91,12 @@ export class PartRenderer {
     const w = part.imageWidth;
     const h = part.imageHeight;
     
-    // Desenha imagem centrada no pivot
-    if (part.mask) {
-      this.ctx.save();
-      this.ctx.beginPath();
-      
-      if (part.mask.type === 'rect') {
-        const b = part.mask.bounds;
-        this.ctx.rect(b.x, b.y, b.width, b.height);
-      } else if (part.mask.type === 'polygon') {
-        this.ctx.beginPath();
-        this.ctx.moveTo(part.mask.points[0].x, part.mask.points[0].y);
-        for (let i = 1; i < part.mask.points.length; i++) {
-          this.ctx.lineTo(part.mask.points[i].x, part.mask.points[i].y);
-        }
-        this.ctx.closePath();
-      }
-      this.ctx.clip();
-      
-      this.ctx.drawImage(part.imageElement, -part.pivot.x * w, -part.pivot.y * h);
-      this.ctx.restore();
-    } else {
-      this.ctx.drawImage(
-        part.imageElement,
-        -part.pivot.x * w,
-        -part.pivot.y * h
-      );
-    }
+    // Desenha imagem centrada no pivot (a imagem já vem recortada com transparência)
+    this.ctx.drawImage(
+      part.imageElement,
+      -part.pivot.x * w,
+      -part.pivot.y * h
+    );
     
     // Desenha seleção se selecionada
     if (part.selected) {

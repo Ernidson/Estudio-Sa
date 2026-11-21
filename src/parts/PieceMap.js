@@ -518,7 +518,7 @@ export class PieceMap {
       tornozelo_direito: 22,
     };
     return widths[bone.id] || 25;
-  }
+  };
   
   getRandomColor() {
     const h = Math.random() * 360;
@@ -722,15 +722,24 @@ export class PieceMap {
     const imgCenterX = this.characterObject.imageWidth / 2;
     const imgCenterY = this.characterObject.imageHeight / 2;
     
+    // Joint position in character-local coordinates (center origin)
     const jointLocalX = jointWorld.x - imgCenterX;
     const jointLocalY = jointWorld.y - imgCenterY;
     
     // Converte para coordenadas relativas ao bounds da máscara
+    // mask.bounds está em coordenadas da imagem (origem topo-esquerda)
+    // jointLocal está em coordenadas do personagem (origem no centro)
     const mask = this.generateMask(regionId);
     if (!mask) return { x: 0.5, y: 0.5 };
     
-    const relX = (jointLocalX - mask.bounds.x) / mask.bounds.width;
-    const relY = (jointLocalY - mask.bounds.y) / mask.bounds.height;
+    // Converte jointLocal (centro da imagem) para coordenadas da imagem (topo-esquerda)
+    const imgCenterX = this.characterObject.imageWidth / 2;
+    const imgCenterY = this.characterObject.imageHeight / 2;
+    const jointImgX = jointLocalX + imgCenterX;
+    const jointImgY = jointLocalY + imgCenterY;
+    
+    const relX = (jointImgX - mask.bounds.x) / mask.bounds.width;
+    const relY = (jointImgY - mask.bounds.y) / mask.bounds.height;
     
     return { x: Math.max(0, Math.min(1, relX)), y: Math.max(0, Math.min(1, relY)) };
   }
