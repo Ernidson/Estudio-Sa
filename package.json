@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/run-tests.js"
+    "test": "node tests/run-tests.js && node --test tests/raster-regression.js"
   },
   "devDependencies": {
     "serve": "^14.2.0",

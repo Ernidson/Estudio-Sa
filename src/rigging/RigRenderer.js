@@ -41,33 +41,8 @@ export class RigRenderer {
     
     this.ctx.save();
     
-    // Aplica transformação do personagem (world = character * rig.base)
-    const charMatrix = characterObject.transform.m;
-    const baseMatrix = rig.baseTransform.m;
-    
-    // Combina: characterTransform * baseTransform
-    const combined = new Transform2D();
-    combined.setMatrix(
-      charMatrix[0] * baseMatrix[0] + charMatrix[2] * baseMatrix[1],
-      charMatrix[1] * baseMatrix[0] + charMatrix[3] * baseMatrix[1],
-      charMatrix[0] * baseMatrix[2] + charMatrix[2] * baseMatrix[3],
-      charMatrix[1] * baseMatrix[2] + charMatrix[3] * baseMatrix[3],
-      charMatrix[0] * baseMatrix[4] + charMatrix[2] * baseMatrix[5] + charMatrix[4],
-      charMatrix[1] * baseMatrix[4] + charMatrix[3] * baseMatrix[5] + charMatrix[5]
-    );
-    
-    // Aplica viewport do renderer
-    const viewportMatrix = this.renderer.viewport.m;
-    const finalMatrix = new Transform2D();
-    finalMatrix.setMatrix(
-      viewportMatrix[0] * combined.m[0] + viewportMatrix[2] * combined.m[1],
-      viewportMatrix[1] * combined.m[0] + viewportMatrix[3] * combined.m[1],
-      viewportMatrix[0] * combined.m[2] + viewportMatrix[2] * combined.m[3],
-      viewportMatrix[1] * combined.m[2] + viewportMatrix[3] * combined.m[3],
-      viewportMatrix[0] * combined.m[4] + viewportMatrix[2] * combined.m[5] + viewportMatrix[4],
-      viewportMatrix[1] * combined.m[4] + viewportMatrix[3] * combined.m[5] + viewportMatrix[5]
-    );
-    
+    // Bone.worldTransform already includes rig.baseTransform.
+    const finalMatrix = this.renderer.viewport.clone().multiply(characterObject.transform);
     this.ctx.transform(
       finalMatrix.m[0], finalMatrix.m[1],
       finalMatrix.m[2], finalMatrix.m[3],
@@ -239,8 +214,7 @@ export class RigRenderer {
     // Converte mundo para espaço local do rig
     const charInv = characterObject.transform.getInverse();
     const charLocal = charInv.transformPoint(worldPos.x, worldPos.y);
-    const baseInv = rig.baseTransform.getInverse();
-    const rigLocalPos = baseInv.transformPoint(charLocal.x, charLocal.y);
+
     
     const threshold = (this.jointRadius * 2) / this.renderer.viewportScale;
     const thresholdSq = threshold * threshold;
@@ -252,8 +226,8 @@ export class RigRenderer {
       if (!bone.visible) continue;
       
       const pos = bone.getWorldPoint();
-      const dx = pos.x - rigLocalPos.x;
-      const dy = pos.y - rigLocalPos.y;
+      const dx = pos.x - charLocal.x;
+      const dy = pos.y - charLocal.y;
       const distSq = dx * dx + dy * dy;
       
       if (distSq <= thresholdSq) {

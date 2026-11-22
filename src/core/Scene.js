@@ -296,7 +296,8 @@ export class Scene {
    * Carrega todas as imagens
    */
   async loadAllImages() {
-    await Promise.all(this.objects.map(o => o.loadImage()));
+    await Promise.all(this.objects.flatMap(obj => [obj.loadImage(),
+      ...(obj.partManager?.getAllParts() || []).map(part => part.loadImage())]));
   }
 
   /**

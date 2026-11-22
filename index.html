@@ -335,7 +335,6 @@
                </div>
              </div>
            </div>
-          </div>
           
           
                        <!-- Painel de Reconhecimento Anatómico -->
@@ -348,6 +347,7 @@
                
                <!-- Estado: Pronto - Botão para iniciar -->
                <div id="recognition-ready" class="ready-state">
+                 <label>Modelo <select id="recognition-method"><option value="BodyPix">BodyPix · partes anatómicas</option><option value="MediaPipeSelfieSegmentation">MediaPipe · pessoa e armadura</option></select></label>
                  <p class="ready-hint">O modelo analisará a silhueta e a armadura para propor máscaras anatómicas.</p>
                  <button id="btn-start-recognition" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -395,36 +395,6 @@
                 <div id="recognition-error" class="error-message hidden"></div>
               </div>
             </div>
-                     <span id="recognition-progress-text" class="progress-text">0%</span>
-                   </div>
-                   <div id="recognition-progress-message" class="progress-message">A preparar...</div>
-                   <button id="btn-cancel-recognition" class="btn btn-secondary btn-sm">Cancelar</button>
-                 </div>
-               </div>
-               
-               <div id="recognition-results" class="hidden">
-                 <div id="recognition-quality-summary" class="results-summary"></div>
-                 <div class="action-buttons">
-                   <button id="btn-apply-recognition" class="btn btn-primary">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <polyline points="20 6 9 17 4 12"></polyline>
-                     </svg>
-                     Aplicar Reconhecimento
-                   </button>
-                   <button id="btn-cancel-recognition-result" class="btn btn-secondary">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <line x1="18" y1="6" x2="6" y2="18"></line>
-                       <line x1="6" y1="6" x2="18" y2="18"></line>
-                     </svg>
-                     Cancelar
-                   </button>
-                 </div>
-                 <div class="hint-text">
-                   As regiões atuais serão preservadas para permitir reverter. Clique em "Aplicar Reconhecimento" para substituir.
-                 </div>
-               </div>
-               
-               <div id="recognition-error" class="error-message hidden"></div>
              </div>
            </div>
            
@@ -440,116 +410,6 @@
               <span id="edit-parts-total" class="badge">0</span>
             </div>
             <ul id="parts-list" class="parts-list"></ul>
-          </div>
-          
-          <!-- Painel de propriedades da peça selecionada -->
-          <div id="part-properties-form" class="properties-form hidden">
-            <div class="form-group">
-              <label for="part-prop-name">Nome</label>
-              <input type="text" id="part-prop-name" readonly>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-bone">Osso</label>
-              <output id="part-prop-bone">—</output>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-pivot">Pivô</label>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="part-prop-pivot-x">X</label>
-                  <input type="number" id="part-prop-pivot-x" step="0.01" min="0" max="1" value="0.5">
-                </div>
-                <div class="form-group">
-                  <label for="part-prop-pivot-y">Y</label>
-                  <input type="number" id="part-prop-pivot-y" step="0.01" min="0" max="1" value="0.5">
-                </div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-visible">Visível</label>
-              <input type="checkbox" id="part-prop-visible" checked>
-            </div>
-            
-            <div class="form-group">
-              <label>Posição Local</label>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="part-prop-x">X</label>
-                  <input type="number" id="part-prop-x" step="0.1">
-                </div>
-                <div class="form-group">
-                  <label for="part-prop-y">Y</label>
-                  <input type="number" id="part-prop-y" step="0.1">
-                </div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-rotation">Rotação Local (graus)</label>
-              <div class="form-row" style="align-items: center; gap: 8px;">
-                <input type="number" id="part-prop-rotation" step="1" min="-180" max="180" value="0" style="width: 80px;">
-                <input type="range" id="part-prop-rotation-slider" min="-180" max="180" value="0" style="flex: 1;">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="part-prop-scale-x">Escala X</label>
-                <input type="number" id="part-prop-scale-x" step="0.01" min="0.01" value="1" style="width: 80px;">
-              </div>
-              <div class="form-group">
-                <label for="part-prop-scale-y">Escala Y</label>
-                <input type="number" id="part-prop-scale-y" step="0.01" min="0.01" value="1" style="width: 80px;">
-              </div>
-            </div>
-            <div class="form-group">
-              <button id="btn-reset-part-adjustments" class="btn btn-secondary" title="Repor Ajustes">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                  <path d="M3 3v5h5"></path>
-                </svg>
-                Repor Ajustes
-              </button>
-              <button id="btn-delete-part" class="btn btn-danger" title="Eliminar Peça">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                Eliminar Peça
-              </button>
-            </div>
-          </div>
-          
-          <!-- Painel de propriedades normal -->
-            <div class="form-group">
-              <label for="prop-name">Nome</label>
-              <input type="text" id="prop-name" readonly>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="prop-x">Posição X</label>
-                <input type="number" id="prop-x" step="0.1">
-              </div>
-              <div class="form-group">
-                <label for="prop-y">Posição Y</label>
-                <input type="number" id="prop-y" step="0.1">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="prop-rotation">Rotação (graus)</label>
-              <input type="number" id="prop-rotation" step="0.1">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="prop-scale-x">Escala X</label>
-                <input type="number" id="prop-scale-x" step="0.01" min="0.01">
-              </div>
-              <div class="form-group">
-                <label for="prop-scale-y">Escala Y</label>
-                <input type="number" id="prop-scale-y" step="0.01" min="0.01">
-              </div>
-            </div>
-            <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformação</button>
           </div>
           
           <!-- Painel de propriedades normal -->
@@ -582,7 +442,7 @@
                 <input type="number" id="prop-scale-y" step="0.01" min="0.01">
               </div>
             </div>
-            <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformaçăo</button>
+            <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformação</button>
           </div>
           
           <!-- Painel de rigging (armadura) -->

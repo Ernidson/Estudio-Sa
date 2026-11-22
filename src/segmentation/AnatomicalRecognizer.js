@@ -1,3 +1,4 @@
+import { refineLabels, recoverHeadBoundary } from './refineLabels.js';
 /**
  * AnatomicalRecognizer - Reconhecimento anatómico automático usando BodyPix + Silhueta + Armadura
  * Combina IA local (TensorFlow.js BodyPix) com a silhueta do PNG e a armadura de 17 ossos
@@ -7,48 +8,23 @@
 import * as tf from '@tensorflow/tfjs';
 import * as bodySegmentation from '@tensorflow-models/body-segmentation';
 
-// Mapeamento das classes BodyPix para regiões do Rigby
-const BODYPIX_TO_RIGBY_REGIONS = {
-  // Cabeça e rosto
-  'face': 'cabeca_anatomica',
-  'left_eye': 'cabeca_anatomica',
-  'right_eye': 'cabeca_anatomica',
-  'left_ear': 'cabeca_anatomica',
-  'right_ear': 'cabeca_anatomica',
-  'nose': 'cabeca_anatomica',
-  'mouth': 'cabeca_anatomica',
-  'hair': 'cabeca_anatomica',
-  
-  // Pescoço
-  'neck': 'pescoco_anatomico',
-  
-  // Tronco
-  'torso_front': 'peito',
-  'torso_back': 'coluna',
-  'left_shoulder': 'ombro_esquerdo',
-  'right_shoulder': 'ombro_direito',
-  'left_hip': 'anca_esquerda',
-  'right_hip': 'anca_direita',
-  
-  // Braços
-  'left_upper_arm': 'ombro_esquerdo',
-  'right_upper_arm': 'ombro_direito',
-  'left_lower_arm': 'cotovelo_esquerdo',
-  'right_lower_arm': 'cotovelo_direito',
-  'left_hand': 'mao_esquerda',
-  'right_hand': 'mao_direita',
-  
-  // Pernas
-  'left_thigh': 'anca_esquerda',
-  'right_thigh': 'anca_direita',
-  'left_lower_leg': 'joelho_esquerdo',
-  'right_lower_leg': 'joelho_direito',
-  'left_foot': 'pe_esquerdo',
-  'right_foot': 'pe_direito',
-};
+// Index order is PART_CHANNELS in @tensorflow-models/body-segmentation.
+const PART_REGION = [
+  'head', 'head', 'l_shoulder', 'l_shoulder', 'r_shoulder', 'r_shoulder',
+  'l_elbow', 'l_elbow', 'r_elbow', 'r_elbow', 'l_wrist', 'r_wrist',
+  'chest', 'chest', 'l_hip', 'l_hip', 'r_hip', 'r_hip',
+  'l_knee', 'l_knee', 'r_knee', 'r_knee', 'l_ankle', 'r_ankle',
+];
 
-// Classes BodyPix que não mapeiam diretamente (serão tratadas por regras)
-const UNMAPPED_CLASSES = ['background', 'clothing', 'accessories'];
+const LEGACY_REGIONS = {
+  head: 'cabeca_anatomica', neck: 'pescoco_anatomico', chest: 'peito', pelvis: 'bacia',
+  l_shoulder: 'ombro_esquerdo', r_shoulder: 'ombro_direito',
+  l_elbow: 'cotovelo_esquerdo', r_elbow: 'cotovelo_direito',
+  l_wrist: 'mao_esquerda', r_wrist: 'mao_direita',
+  l_hip: 'anca_esquerda', r_hip: 'anca_direita',
+  l_knee: 'joelho_esquerdo', r_knee: 'joelho_direito',
+  l_ankle: 'pe_esquerdo', r_ankle: 'pe_direito',
+};
 
 export class AnatomicalRecognizer {
   constructor(imageElement, silhouetteAnalyzer, rig, characterObject, renderer) {
@@ -71,8 +47,8 @@ export class AnatomicalRecognizer {
     
     // Configuração
     this.config = {
-      modelType: 'MediaPipeSelfieSegmentation', // 'MediaPipeSelfieSegmentation' ou 'BodyPix'
-      inputResolution: { width: 256, height: 256 },
+      modelType: 'BodyPix', // 'MediaPipeSelfieSegmentation' ou 'BodyPix'
+      inputResolution: { width: 640, height: 640 },
       segmentationThreshold: 0.5,
       maxDetections: 1,
       scoreThreshold: 0.3,
@@ -111,8 +87,8 @@ export class AnatomicalRecognizer {
         this.bodyPixModel = await bodySegmentation.createSegmenter(
           bodySegmentation.SupportedModels.BodyPix,
           {
-            runtime: 'tfjs',
-            modelType: 'general', // ou 'mobile' para mais velocidade
+            architecture: 'MobileNetV1', outputStride: 16, multiplier: 0.75, quantBytes: 2,
+            modelUrl: new URL('models/bodypix/model.json', document.baseURI).href,
           }
         );
         
@@ -166,7 +142,8 @@ export class AnatomicalRecognizer {
     this.isProcessing = true;
     this.cancelRequested = false;
     const onProgress = options.onProgress || (() => {});
-    const method = options.method || this.config.modelType;
+    this.config.modelType = options.method || this.config.modelType;
+    this.progressCallback = onProgress;
     
     try {
       // 1. Carrega modelo se necessário
@@ -182,44 +159,9 @@ export class AnatomicalRecognizer {
       // 3. Executa inferência com o modelo apropriado
       this._reportProgress(40, 'A executar segmentação anatómica...');
       
-      let segmentation;
-      if (this.config.modelType === 'BodyPix') {
-        segmentation = await this._recognizeWithBodyPix(inputCanvas);
-      } else {
-        // MediaPipe Selfie Segmentation (padrão)
-        const segmentation = await this.mediaPipeModel.segmentPeople(inputCanvas, {
-          flipHorizontal: false,
-          segmentationThreshold: this.config.segmentationThreshold,
-        });
-        // Converter formato MediaPipe para formato unificado
-        segmentation = this._normalizeMediaPipeResult(segmentation);
-      }
-      
-      // DIAGNÓSTICO: Inspecionar resultado da segmentação
-      console.log('[DIAG] Segmentação recebida:', {
-        type: typeof segmentation,
-        isArray: Array.isArray(segmentation),
-        length: segmentation?.length,
-        firstPersonKeys: segmentation?.[0] ? Object.keys(segmentation[0]) : null,
-        firstPersonConstructor: segmentation?.[0]?.constructor?.name,
-        firstPerson: segmentation?.[0] ? {
-          hasSegmentation: !!segmentation[0].segmentation,
-          segmentationType: typeof segmentation[0].segmentation,
-          segmentationConstructor: segmentation[0].segmentation?.constructor?.name,
-          segmentationKeys: segmentation[0].segmentation ? Object.keys(segmentation[0].segmentation) : null,
-          hasMask: !!segmentation[0].segmentation?.mask,
-          maskType: segmentation[0].segmentation?.mask?.constructor?.name,
-          maskKeys: segmentation[0].segmentation?.mask ? Object.keys(segmentation[0].segmentation.mask) : null,
-          hasToImageData: typeof segmentation[0].segmentation?.mask?.toImageData === 'function',
-          hasToTensor: typeof segmentation[0].segmentation?.mask?.toTensor === 'function',
-          hasToCanvas: typeof segmentation[0].segmentation?.mask?.toCanvas === 'function',
-          hasGetUnderlyingType: typeof segmentation[0].segmentation?.mask?.getUnderlyingType === 'function',
-          hasWidth: 'width' in (segmentation[0].segmentation || {}),
-          hasHeight: 'height' in (segmentation[0].segmentation || {}),
-          hasData: 'data' in (segmentation[0].segmentation || {}),
-        } : null
-      });
-      
+      const segmentation = this.config.modelType === 'BodyPix'
+        ? await this._recognizeWithBodyPix(inputCanvas)
+        : await this.mediaPipeModel.segmentPeople(inputCanvas);
       if (this.cancelRequested) throw new Error('Cancelado pelo utilizador');
       
       // 4. Processa resultados
@@ -282,270 +224,98 @@ export class AnatomicalRecognizer {
     return canvas;
   }
 
-  /**
-   * Normaliza o resultado do MediaPipe para formato unificado
-   * MediaPipe retorna array de pessoas com {mask: Mask}, BodyPix retorna array de {mask: Mask, bodyParts: ...}
-   */
-  _normalizeMediaPipeResult(segmentation) {
-    return segmentation.map(person => ({
-      mask: person.mask,
-      // BodyPix tem bodyParts, MediaPipe não tem
-      bodyParts: null
+  async _recognizeWithBodyPix(canvas) {
+    return this.bodyPixModel.segmentPeople(canvas, {
+      segmentBodyParts: true, multiSegmentation: false,
+      internalResolution: 'high', segmentationThreshold: this.config.segmentationThreshold,
     });
   }
 
-  /**
-   * Reconhecimento com BodyPix (suporta segmentBodyParts: true)
-   */
-  async _recognizeWithBodyPix(inputCanvas) {
-    if (!this.bodyPixModel) {
-      throw new Error('Modelo BodyPix não carregado');
-    }
-    
-    this._reportProgress(40, 'A executar segmentação BodyPix (24 partes)...');
-    
-    const segmentation = await this.bodyPixModel.segmentPeople(inputCanvas, {
-      flipHorizontal: false,
-      segmentationThreshold: this.config.segmentationThreshold,
-      multiSegmentation: false,
-      segmentBodyParts: true,  // Habilita 24 partes do corpo
-    });
-    
-    // BodyPix já retorna array de pessoas com máscaras e bodyParts
-    // Normaliza para formato interno
-    return segmentation.map(person => ({
-      mask: person.mask,
-      bodyParts: person.bodyParts || null
-    }));
-  }
-    const imgW = this.imageElement.width;
-    const imgH = this.imageElement.height;
-    const modelW = this.config.inputResolution.width;
-    const modelH = this.config.inputResolution.height;
-    
-    // Obtém a silhueta real (canal alfa)
-    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask();
-    const silW = this.silhouetteAnalyzer._alphaWidth;
-    const silH = this.silhouetteAnalyzer._alphaHeight;
-    
-    // DIAGNÓSTICO: Verificar silhueta
-    console.log('[DIAG] Silhueta:', {
-      silW, silH,
-      totalPixels: silW * silH,
-      silhouettePixels: silhouetteMask.reduce((a, b) => a + b, 0),
-      silhouettePercent: (silhouetteMask.reduce((a, b) => a + b, 0) / (silW * silH) * 100).toFixed(2) + '%'
-    });
-    
-    // Calcula transformação modelo -> imagem original
-    const scale = Math.min(modelW / imgW, modelH / imgH);
-    const drawW = imgW * scale;
-    const drawH = imgH * scale;
-    const offsetX = (modelW - drawW) / 2;
-    const offsetY = (modelH - drawH) / 2;
-    
+  async _reprojectAndCombineMasks(people) {
+    const silhouette = this.silhouetteAnalyzer.getSilhouetteMask(1);
+    const w = this.silhouetteAnalyzer._alphaWidth;
+    const h = this.silhouetteAnalyzer._alphaHeight;
+    const input = this.config.inputResolution;
+    const scale = Math.min(input.width / w, input.height / h);
+    const dx = (input.width - w * scale) / 2;
+    const dy = (input.height - h * scale) / 2;
     const masks = new Map();
-    
-    // Processa cada pessoa detectada (normalmente 1)
-    for (const person of segmentation) {
-      if (!person.mask) {
-        console.warn('[DIAG] Pessoa sem máscara, ignorando:', person);
-        continue;
-      }
-      
-      // DIAGNÓSTICO: Inspecionar objeto de segmentação
-      const segMask = person.mask;
-      let segData, segW, segH;
-      
-      // O MediaPipe Selfie Segmentation retorna um objeto Mask com métodos toImageData/toTensor
-      if (segMask && typeof segMask.toImageData === 'function') {
-        const imageData = await segMask.toImageData();
-        segW = imageData.width;
-        segH = imageData.height;
-        segData = imageData.data; // Uint8ClampedArray RGBA
-        console.log('[DIAG] Máscara do modelo:', { segW, segH, dataLength: segData.length });
-      } else if (segMask.width && segMask.height && segMask.data) {
-        // Formato antigo/BodyPix
-        segW = segMask.width;
-        segH = segMask.height;
-        segData = segMask.data;
-        console.log('[DIAG] Formato BodyPix:', { segW, segH, dataLength: segData.length });
-      } else {
-        console.error('[DIAG] Formato de segmentação não reconhecido:', segMask);
-        continue;
-      }
-      
-      if (!segData || segW !== 256 || segH !== 256) {
-        console.warn('[DIAG] Dimensões inesperadas:', { segW, segH, expected: '256x256' });
-      }
-      
-      const personMask = new Uint8Array(silW * silH);
-      
-      for (let y = 0; y < silH; y++) {
-        for (let x = 0; x < silW; x++) {
-          // Mapeia coordenadas silhueta -> modelo
-          const modelX = (x / silW) * imgW * scale + offsetX;
-          const modelY = (y / silH) * imgH * scale + offsetY;
-          
-          // Mapeia para resolução da segmentação
-          const segX = Math.floor((modelX / modelW) * segW);
-          const segY = Math.floor((modelY / modelH) * segH);
-          
-          if (segX >= 0 && segX < segW && segY >= 0 && segY < segH) {
-            const segIdx = segY * segW + segX;
-            const silIdx = y * silW + x;
-            
-            // A máscara ImageData tem 4 canais RGBA por píxel.
-            // O canal alfa (índice 3) contém a probabilidade de primeiro plano (0-255).
-            const alphaIdx = segIdx * 4 + 3;
-            const alpha = segData[alphaIdx];
-            const threshold255 = this.config.segmentationThreshold * 255;
-            
-            // Apenas onde há silhueta real E o modelo detecta pessoa (alfa > limiar)
-            if (silhouetteMask[silIdx] && alpha > threshold255) {
-              personMask[silIdx] = 1;
-            }
-          }
-        }
-      }
-      
-      classMasks.set('person', personMask);
-      
-      // Se BodyPix com bodyParts, usa mapeamento direto das 24 partes
-      if (person.bodyParts && Object.keys(person.bodyParts).length > 0) {
-        console.log('[DIAG] Processando BodyPix bodyParts...');
-        const bodyPixMasks = this._processBodyPixBodyParts(
-          person.bodyParts, silW, silH, personMask, silW, silH
-        );
-        for (const [regionId, mask] of bodyPixMasks) {
-          masks.set(regionId, mask);
-        }
-      } else {
-        // Método tradicional: divide a máscara da pessoa usando a armadura
-        const anatomicalMasks = await this._splitPersonMaskByRig(personMask, silW, silH);
-        for (const [regionId, mask] of anatomicalMasks) {
-          masks.set(regionId, mask);
+    const foreground = new Uint8Array(w * h);
+    for (const person of people) {
+      const { data, width, height } = await person.mask.toImageData();
+      for (let y = 0; y < h; y++) {
+        const sy = Math.floor(((y + 0.5) * scale + dy) * height / input.height);
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          if (!silhouette[i] || foreground[i]) continue;
+          const sx = Math.floor(((x + 0.5) * scale + dx) * width / input.width);
+          const pixel = (sy * width + sx) * 4;
+          if (data[pixel + 3] < this.config.segmentationThreshold * 255) continue;
+          if (this.config.modelType === 'BodyPix') {
+            if (data[pixel] >= PART_REGION.length) continue;
+            foreground[i] = data[pixel] + 1;
+          } else foreground[i] = 1;
         }
       }
     }
-    
+    if (this.config.modelType !== 'BodyPix') return this._splitPersonMaskByRig(foreground, w, h);
+    const source = document.createElement('canvas');
+    source.width = w;
+    source.height = h;
+    const ctx = source.getContext('2d');
+    ctx.drawImage(this.imageElement, 0, 0, w, h);
+    const rgba = ctx.getImageData(0, 0, w, h).data;
+    const labels = refineLabels(foreground, silhouette, rgba, w, h);
+    recoverHeadBoundary(labels, rgba, w, h);
+    // The calibrated pair disambiguates left/right when the prediction is much
+    // closer to the opposite limb (common in rear views).
+    const names = {head:'cabeca', chest:'peito', l_wrist:'pulso_esquerdo', r_wrist:'pulso_direito',
+      l_ankle:'tornozelo_esquerdo', r_ankle:'tornozelo_direito'};
+    const centers = {};
+    this.rig.computeWorldTransforms();
+    for (const key of new Set(PART_REGION)) {
+      const bone = this.rig.getBone(key) || this.rig.getBone(names[key] || LEGACY_REGIONS[key]);
+      if (!bone) continue;
+      const start = bone.getWorldPoint(), end = bone.children[0]?.getWorldPoint() || start;
+      centers[key] = [start.x + w / 2, start.y + h / 2, end.x + w / 2, end.y + h / 2];
+    }
+    const pelvis = this.rig.getBone('pelvis') || this.rig.getBone('bacia');
+    const hips = [centers.l_hip, centers.r_hip];
+    // The upper edge follows the predicted clothing transition. The lower edge
+    // has no dedicated BodyPix class; estimate it in the calibrated thigh frame.
+    const hipLine = hips.every(Boolean) && pelvis ? {
+      x: (hips[0][0] + hips[1][0]) / 2,
+      y: (hips[0][1] + hips[1][1]) / 2,
+      dx: ((hips[0][2] - hips[0][0]) + (hips[1][2] - hips[1][0])) / 2,
+      dy: ((hips[0][3] - hips[0][1]) + (hips[1][3] - hips[1][1])) / 2,
+    } : null;
+    for (let i = 0; i < labels.length; i++) {
+      if (!labels[i]) continue;
+      let key = PART_REGION[labels[i] - 1];
+      if (key[1] === '_') {
+        const other = (key[0] === 'l' ? 'r' : 'l') + key.slice(1);
+        const a = centers[key], b = centers[other];
+        if (a && b) {
+          const x = i % w, y = Math.floor(i / w);
+          const dist = p => this._pointToSegmentDistSq(x, y, ...p);
+          const margin = ((a[0]-b[0])**2 + (a[1]-b[1])**2) * 0.15;
+          if (dist(b) + margin < dist(a)) key = other;
+        }
+      }
+      if (hipLine && (key === 'l_hip' || key === 'r_hip')) {
+        const {x, y, dx, dy} = hipLine;
+        const along = ((i % w - x)*dx + (Math.floor(i / w) - y)*dy) / (dx*dx + dy*dy || 1);
+        if (along < 0.36 && along > -0.5) key = 'pelvis';
+      }
+      const id = this.rig.getBone(key) ? key : LEGACY_REGIONS[key];
+      if (!masks.has(id)) masks.set(id, new Uint8Array(w*h));
+      masks.get(id)[i] = 1;
+    }
+    if (!masks.size) throw new Error('BodyPix não identificou partes nesta imagem.');
     return masks;
   }
 
   /**
-   * Converte máscaras de partes do corpo do BodyPix para regiões do Rigby
-   * BodyPix tem 24 partes: face, left_eye, right_eye, left_ear, right_ear, nose, mouth, hair,
-   * neck, torso_front, torso_back, left_shoulder, right_shoulder, left_hip, right_hip,
-   * left_upper_arm, right_upper_arm, left_lower_arm, right_lower_arm, left_hand, right_hand,
-   * left_thigh, right_thigh, left_lower_leg, right_lower_leg, left_foot, right_foot
-   */
-  _processBodyPixBodyParts(personBodyParts, silW, silH, personMask, silW, silH) {
-    const masks = new Map();
-    
-    // Mapeamento das classes BodyPix para regiões do Rigby
-    const BODYPIX_TO_RIGBY = {
-      // Cabeça e rosto
-      'face': 'cabeca_anatomica',
-      'left_eye': 'cabeca_anatomica',
-      'right_eye': 'cabeca_anatomica',
-      'left_ear': 'cabeca_anatomica',
-      'right_ear': 'cabeca_anatomica',
-      'nose': 'cabeca_anatomica',
-      'mouth': 'cabeca_anatomica',
-      'hair': 'cabeca_anatomica',
-      
-      // Pescoço
-      'neck': 'pescoco_anatomico',
-      
-      // Tronco
-      'torso_front': 'peito',
-      'torso_back': 'coluna',
-      'left_shoulder': 'ombro_esquerdo',
-      'right_shoulder': 'ombro_direito',
-      'left_hip': 'anca_esquerda',
-      'right_hip': 'anca_direita',
-      
-      // Braços
-      'left_upper_arm': 'ombro_esquerdo',
-      'right_upper_arm': 'ombro_direito',
-      'left_lower_arm': 'cotovelo_esquerdo',
-      'right_lower_arm': 'cotovelo_direito',
-      'left_hand': 'mao_esquerda',
-      'right_hand': 'mao_direita',
-      
-      // Pernas
-      'left_thigh': 'anca_esquerda',
-      'right_thigh': 'anca_direita',
-      'left_lower_leg': 'joelho_esquerdo',
-      'right_lower_leg': 'joelho_direito',
-      'left_foot': 'pe_esquerdo',
-      'right_foot': 'pe_direito',
-    };
-    
-    // Agrupa máscaras por região Rigby
-    const rigbyMasks = new Map();
-    const regionPixels = new Map(); // Para resolver sobreposições
-    
-    if (!personBodyParts) {
-      return new Map();
-    }
-    
-    // Obtém a silhueta real para limitar as máscaras
-    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask();
-    
-    // Processa cada parte do BodyPix
-    for (const [bpPart, rigbyRegion] of Object.entries(BODYPIX_TO_RIGBY)) {
-      if (!personBodyParts[bpPart]) continue;
-      
-      const bpMask = personBodyParts[bpPart];
-      if (!bpMask || !bpMask.data) continue;
-      
-      const bpW = bpMask.width;
-      const bpH = bpMask.height;
-      const bpData = bpMask.data; // RGBA
-      
-      // Converte máscara BodyPix (256x256) para resolução da silhueta
-      const regionMask = new Uint8Array(silW * silH);
-      
-      // Limiar para considerar pixel como parte (alfa > threshold)
-      const threshold255 = this.config.segmentationThreshold * 255;
-      
-      for (let y = 0; y < silH; y++) {
-        for (let x = 0; x < silW; x++) {
-          const silIdx = y * silW + x;
-          
-          // Verifica se está dentro da silhueta real
-          if (!personMask[silIdx]) continue;
-          
-          // Mapeia coordenadas da silhueta para coordenadas BodyPix (256x256)
-          const scaleX = bpMask.width / silW;
-          const scaleY = bpMask.height / silH;
-          const bpX = Math.floor(x * scaleX);
-          const bpY = Math.floor(y * scaleY);
-          
-          if (bpX >= 0 && bpX < bpMask.width && bpY >= 0 && bpY < bpMask.height) {
-            const bpIdx = (bpY * bpMask.width + bpX) * 4 + 3; // Canal alfa
-            const alpha = bpMask.data[bpIdx];
-            
-            if (alpha > this.config.segmentationThreshold * 255) {
-              // Cria a regionMask para esta parte
-              let regionMask = rigbyMasks.get(rigbyRegion);
-              if (!regionMask) {
-                regionMask = new Uint8Array(silW * silH);
-              }
-              regionMask[silIdx] = 1;
-              rigbyMasks.set(rigbyRegion, regionMask);
-            }
-          }
-        }
-      }
-      
-      // Resolve sobreposições: prioridade por região (ordem anatómica)
-      // Se já existe pixel atribuído, decide por prioridade
-      // (já tratado dentro do loop acima - sobrescreve apenas se não tinha)
-    }
-    
-    return rigbyMasks;
-  }
    * Combina: posição dos ossos + heurísticas anatómicas + silhueta
    */
   async _splitPersonMaskByRig(personMask, silW, silH) {
@@ -561,7 +331,9 @@ export class AnatomicalRecognizer {
       const worldPos = bone.getWorldPoint();
       const silPos = this._worldToSilhouetteSpace(worldPos, silW, silH);
       if (silPos) {
-        bonePositions.set(bone.id, silPos);
+        const aliases = {head:'cabeca', neck:'pescoco', l_wrist:'pulso_esquerdo', r_wrist:'pulso_direito',
+          l_ankle:'tornozelo_esquerdo', r_ankle:'tornozelo_direito'};
+        bonePositions.set(aliases[bone.id] || LEGACY_REGIONS[bone.id] || bone.id, silPos);
       }
     }
     
@@ -574,7 +346,8 @@ export class AnatomicalRecognizer {
     for (const [regionId, def] of Object.entries(regionDefinitions)) {
       const mask = this._createRegionMask(personMask, def, silW, silH, bonePositions, existingMasks);
       if (mask) {
-        masks.set(regionId, mask);
+        const key = Object.keys(LEGACY_REGIONS).find(id => LEGACY_REGIONS[id] === regionId);
+        masks.set(key && this.rig.getBone(key) ? key : regionId, mask);
         existingMasks.set(regionId, mask);
       }
     }
@@ -590,8 +363,7 @@ export class AnatomicalRecognizer {
     if (!this.characterObject || !this.renderer) return null;
     
     // Mundo -> espaço local do personagem (usa a transform inversa do personagem)
-    const charInv = this.characterObject.transform.getInverse();
-    const localPos = charInv.transformPoint(worldPos.x, worldPos.y);
+    const localPos = worldPos;
     
     // Espaço local do personagem -> espaço da imagem (centro da imagem na origem)
     const imgCenterX = this.characterObject.imageWidth / 2;
@@ -758,44 +530,6 @@ export class AnatomicalRecognizer {
     
     if (!def.center && !def.start && !def.points) return null;
     
-    // Helper: point in polygon test
-    const pointInPolygon = (x, y, points) => {
-      let inside = false;
-      for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        const xi = points[i].x, yi = points[i].y;
-        const xj = points[j].x, yj = points[j].y;
-        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    };
-    
-    // Helper: point in capsule
-    const pointInCapsule = (x, y, start, end, radius) => {
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq === 0) return false;
-      const t = Math.max(0, Math.min(1, ((x - start.x) * dx + (y - start.y) * dy) / lenSq));
-      const projX = start.x + t * dx;
-      const projY = start.y + t * dy;
-      const dx2 = x - projX;
-      const dy2 = y - projY;
-      return dx2 * dx2 + dy2 * dy2 <= radius * radius;
-    };
-    
-    // Helper: point in ellipse
-    const pointInEllipse = (x, y, center, radiusX, radiusY) => {
-      const dx = (x - center.x) / radiusX;
-      const dy = (y - center.y) / radiusY;
-      return dx * dx + dy * dy <= 1;
-    };
-    
-    // Helper: point in rect
-    const pointInRect = (x, y, center, width, height) => {
-      return Math.abs(x - center.x) <= width / 2 && Math.abs(y - center.y) <= height / 2;
-    };
-    
     // Para polígonos, usar point-in-polygon test direto (sem flood fill)
     if (def.type === 'polygon' && def.points && def.points.length >= 3) {
       for (let y = 0; y < silH; y++) {
@@ -939,7 +673,7 @@ export class AnatomicalRecognizer {
   _calculateQualityMetrics() {
     if (!this.anatomicalMasks || !this.silhouetteAnalyzer) return null;
     
-    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask();
+    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask(1);
     const totalSilhouette = silhouetteMask.reduce((a, b) => a + b, 0);
     
     let covered = 0;
@@ -994,7 +728,7 @@ export class AnatomicalRecognizer {
     
     const silW = this.silhouetteAnalyzer._alphaWidth;
     const silH = this.silhouetteAnalyzer._alphaHeight;
-    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask();
+    const silhouetteMask = this.silhouetteAnalyzer.getSilhouetteMask(1);
     
     const canvas = document.createElement('canvas');
     canvas.width = silW;
@@ -1034,7 +768,7 @@ export class AnatomicalRecognizer {
       let assigned = false;
       for (const [regionId, mask] of this.anatomicalMasks) {
         if (mask[i]) {
-          const color = regionColors[regionId] || [128, 128, 128];
+          const color = regionColors[LEGACY_REGIONS[regionId] || regionId] || [128, 128, 128];
           data[i * 4] = color[0];
           data[i * 4 + 1] = color[1];
           data[i * 4 + 2] = color[2];
@@ -1128,6 +862,8 @@ export class AnatomicalRecognizer {
       this.bodyPixModel.dispose();
       this.bodyPixModel = null;
     }
+    this.mediaPipeModel?.dispose();
+    this.mediaPipeModel = null;
     this.segmentationResult = null;
     this.anatomicalMasks = null;
     this.qualityMetrics = null;

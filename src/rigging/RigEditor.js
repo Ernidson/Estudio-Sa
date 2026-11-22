@@ -162,26 +162,9 @@ export class RigEditor {
     const worldPos = this.rigRenderer._screenToWorld(screenX, screenY);
     if (!worldPos) return;
     
-    // Converte coordenada mundial para o espaço apropriado
-    // moveBoneToWorld espera:
-    // - Para raiz: coordenadas locais do personagem (após baseTransform)
-    // - Para filhos: coordenadas mundiais
-    let targetX, targetY;
-    if (this.draggedBone.parent) {
-      // Filhos: coordenadas mundiais
-      targetX = worldPos.x;
-      targetY = worldPos.y;
-    } else {
-      // Raiz: converter mundo para espaço local do personagem (inverter transform do personagem)
-      const charInv = this.characterObject.transform.getInverse();
-      const charLocal = charInv.transformPoint(worldPos.x, worldPos.y);
-      targetX = charLocal.x;
-      targetY = charLocal.y;
-    }
-    
-    // Move bone no rig (atualiza posição local)
-    this.rig.moveBoneToWorld(this.draggedBone.id, targetX, targetY);
-    
+    const local = this.characterObject.transform.inverseTransformPoint(worldPos.x, worldPos.y);
+    this.rig.moveBoneToWorld(this.draggedBone.id, local.x, local.y);
+
     // Atualiza UI
     this._updatePropertiesPanel();
   }

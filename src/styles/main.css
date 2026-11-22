@@ -749,14 +749,13 @@ body {
 
 .calibration-mode-active #no-selection,
 .calibration-mode-active #properties-form,
-.calibration-mode-active #rigging-panel,
 .calibration-mode-active #piece-map-toolbar,
 .calibration-mode-active #edit-parts-toolbar,
 .calibration-mode-active #test-movement-controls {
   display: none;
 }
 
-.calibration-mode-active #calibration-panel {
+.calibration-mode-active #calibration-panel:not(.hidden) {
   display: block;
 }
 

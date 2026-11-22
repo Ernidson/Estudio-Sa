@@ -1,3 +1,4 @@
+import { encodeRegion, paintRegion, rasterPath } from './segmentation/RasterRegion.js';
 /**
  * Rigby Studio 2D - Ponto de entrada principal
  */
@@ -189,8 +190,8 @@ function renderLoop() {
   app.renderer.render(app.scene);
   
   // Render peças recortadas por cima
-  if (app.partManager && app.partRenderer && app.currentCharacterObject) {
-    app.partRenderer.drawParts(app.partManager, app.currentCharacterObject);
+  for (const obj of app.scene.getVisibleObjects()) {
+    if (obj.partManager) app.partRenderer.drawParts(obj.partManager, obj);
   }
   
   // Render preview de recorte se no modo de recorte
@@ -204,7 +205,7 @@ function renderLoop() {
   }
   
   // Render Calibrar Armadura (mostra regiões e articulações)
-  if (app.isCalibrationMode && app.pieceMap) {
+  if (app.isCalibrationMode && app.calibrationTool === 'regions' && app.pieceMap) {
     app.pieceMap.draw(app.renderer.ctx, app.renderer.viewport);
   }
   
@@ -371,8 +372,6 @@ function setupEventListeners() {
   document.getElementById('btn-move-part').addEventListener('click', () => setEditPartsTool('move'));
   document.getElementById('btn-edit-pivot').addEventListener('click', () => setEditPartsTool('pivot'));
   document.getElementById('btn-exit-edit-parts').addEventListener('click', exitEditPartsMode);
-  document.getElementById('btn-reset-part-adjustments').addEventListener('click', resetPartAdjustments);
-  document.getElementById('btn-delete-part').addEventListener('click', deleteSelectedPart);
 
   // Calibrar Armadura (Fase 2C)
   document.getElementById('btn-calibrate-armor').addEventListener('click', toggleCalibrationMode);
@@ -444,10 +443,27 @@ function onResize() {
   app.renderer.resize();
 }
 
+function brushRegion(event, x, y) {
+  if (!app.isCalibrationMode || app.calibrationTool !== 'regions' || !(event.shiftKey || event.altKey)) return false;
+  const region = app.pieceMap.getSelectedRegion();
+  if (!region?.raster || !app.silhouetteAnalyzer) return false;
+  const obj = app.currentCharacterObject;
+  const point = app.pieceMap.screenToCharacterLocal(x, y);
+  paintRegion(app.pieceMap.getAllRegions(), event.altKey ? null : region,
+    Math.floor(point.x + obj.imageWidth / 2), Math.floor(point.y + obj.imageHeight / 2),
+    8, app.silhouetteAnalyzer.getAlphaData(), obj.imageWidth, obj.imageHeight);
+  return true;
+}
+
 /**
  * Mouse down
  */
 function onMouseDown(e) {
+  if (e.button === 1) {
+    app.panOrigin = {x:e.clientX, y:e.clientY};
+    e.preventDefault();
+    return;
+  }
   if (e.button !== 0) return; // Apenas botão esquerdo
 
   const rect = app.canvas.getBoundingClientRect();
@@ -456,6 +472,8 @@ function onMouseDown(e) {
 
   app.lastMousePos = { x, y };
   app.isMouseDown = true;
+  app.dragPartStart = null;
+  if (brushRegion(e, x, y)) return;
 
   // Modo de recorte: delega para partManager
   if (app.isCuttingMode && app.partManager) {
@@ -486,6 +504,7 @@ function onMouseDown(e) {
     // Tenta selecionar peça
     const hitPart = app.partRenderer.hitTestPart(app.partManager, app.currentCharacterObject, x, y);
     if (hitPart) {
+      app.dragPartStart = { x, y, position: { ...hitPart.localPosition } };
       app.editPartsSelectedPartId = hitPart.id;
       app.partManager.selectPart(hitPart.id);
       updateEditPartsPanel(hitPart);
@@ -550,9 +569,16 @@ function onMouseDown(e) {
  * Mouse move
  */
 function onMouseMove(e) {
+  if (app.panOrigin) {
+    app.renderer.pan(e.clientX - app.panOrigin.x, e.clientY - app.panOrigin.y);
+    app.panOrigin = { x: e.clientX, y: e.clientY };
+    return;
+  }
   const rect = app.canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
+
+  if (app.isMouseDown && brushRegion(e, x, y)) return;
 
   // Modo de recorte: atualiza preview
   if (app.isCuttingMode && app.partManager) {
@@ -577,28 +603,15 @@ function onMouseMove(e) {
   // Modo Editar Peças: arraste de peça
   if (app.isEditPartsMode && app.partManager && app.isMouseDown && app.editPartsSelectedPartId) {
     const part = app.partManager.getPart(app.editPartsSelectedPartId);
-    if (part && app.editPartsTool === 'move') {
-      // Converte coordenadas de ecrã para coordenadas locais do osso
-      const viewportInv = app.renderer.viewport.getInverse();
-      const worldPos = viewportInv.transformPoint(x, y);
-      const charInv = app.currentCharacterObject.transform.getInverse();
-      const charLocal = charInv.transformPoint(worldPos.x, worldPos.y);
-      
-      // Inverte baseTransform do rig
-      const rig = app.partManager.rig;
-      const baseInv = rig.baseTransform.getInverse();
-      const rigLocal = baseInv.transformPoint(charLocal.x, charLocal.y);
-      
-      // Inverte worldTransform do bone
-      const bone = rig.getBone(app.editPartsSelectedPartId);
-      if (bone && bone.worldTransform) {
-        const boneInv = bone.worldTransform.getInverse();
-        const boneLocal = boneInv.transformPoint(rigLocal.x, rigLocal.y);
-        
-        // Atualiza posição local da peça
-        part.setLocalPosition(boneLocal.x, boneLocal.y);
-        app.renderer.render(app.scene);
-      }
+    if (part && app.editPartsTool === 'move' && app.dragPartStart) {
+      const bone = app.partManager.rig.getBone(part.boneId);
+      const inverse = app.renderer.viewport.clone().multiply(app.currentCharacterObject.transform)
+        .multiply(bone.worldTransform).getInverse();
+      const start = app.dragPartStart;
+      const from = inverse.transformPoint(start.x, start.y);
+      const to = inverse.transformPoint(x, y);
+      part.setLocalPosition(start.position.x + to.x - from.x, start.position.y + to.y - from.y);
+      updatePartPropertiesPanel(part);
     }
     updateCanvasInfo(x, y);
     return;
@@ -666,6 +679,7 @@ function onMouseMove(e) {
  * Mouse up
  */
 function onMouseUp(e) {
+  app.panOrigin = null;
   const rect = app.canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -759,6 +773,8 @@ function onTouchStart(e) {
 
     app.lastMousePos = { x, y };
     app.isMouseDown = true;
+  app.dragPartStart = null;
+  if (brushRegion(e, x, y)) return;
 
     const obj = app.selectionManager.handleClick(x, y);
     if (obj) {
@@ -968,12 +984,20 @@ async function openProject() {
     }
 
     // Carrega projeto na cena
-    app.scene = Scene.fromJSON(project);
+    const scene = Scene.fromJSON(project);
+    await scene.loadAllImages();
+    if (app.isCalibrationMode) exitCalibrationMode();
+    if (app.isEditPartsMode) exitEditPartsMode();
+    if (app.isPieceMapMode) exitPieceMapMode();
+    if (app.isRiggingMode) exitRiggingMode();
+    app.scene = scene;
+    app.imageImporter.scene = scene;
+    app.selectionManager.scene = scene;
+    app.rigEditor.scene = scene;
     projectStorage.setCurrentProject(project);
     app.scene.name = project.name;
 
-    // Carrega imagens
-    await app.scene.loadAllImages();
+
 
     // Atualiza UI
     app.selectionManager.clearSelection();
@@ -998,8 +1022,8 @@ async function saveProject() {
     const projectData = app.scene.toJSON();
     projectData.name = app.scene.name;
 
-    await projectStorage.saveAsFile(projectData);
-    updateStatus('Projeto salvo com sucesso');
+    const saved = await projectStorage.saveAsFile(projectData);
+    updateStatus(saved?.cancelled ? 'Gravação cancelada' : 'Projeto guardado com sucesso');
   } catch (err) {
     console.error('Erro ao salvar projeto:', err);
     updateStatus(`Erro ao salvar: ${err.message}`);
@@ -1450,6 +1474,8 @@ function enterPieceMapMode() {
   }
   
   app.pieceMap = obj.pieceMap;
+  app.currentCharacterObject = obj;
+  app.partManager = obj.partManager;
   
   // Configura callbacks
   app.pieceMap.onSelectionChange = onPieceMapSelectionChange;
@@ -1470,7 +1496,7 @@ function enterPieceMapMode() {
   showPartsPanel();
   
   // Atualiza painel lateral com regiões
-  updatePieceMapPanel(null);
+  onPieceMapSelectionChange(app.pieceMap.getSelectedRegion());
 }
 
 /**
@@ -1584,6 +1610,7 @@ function enterCalibrationMode() {
   
   // Ativa modo
   app.isCalibrationMode = true;
+  if (obj.pieceMap.getAllRegions().some(region => region.raster)) initializeSilhouetteAnalyzer();
   app.calibrationTool = 'joints'; // Começa com Articulações
   app.calibrationSelectedRegionId = null;
   
@@ -1624,7 +1651,8 @@ function exitCalibrationMode() {
   app.recognitionResult = null;
   app.previousPieceMapState = null;
   if (app.anatomicalRecognizer) {
-    app.anatomicalRecognizer.dispose();
+    app.anatomicalRecognizer.cancel();
+    if (!app.anatomicalRecognizer.isProcessing) app.anatomicalRecognizer.dispose();
     app.anatomicalRecognizer = null;
   }
   
@@ -1820,27 +1848,36 @@ function updateCalibrationPanel() {
     const riggingPanel = document.getElementById('rigging-panel');
     if (riggingPanel) {
       // Copia o conteúdo do rigging panel para o calibration panel
-      calibrationPanel.innerHTML = riggingPanel.innerHTML;
-      calibrationPanel.classList.remove('hidden');
-      riggingPanel.classList.add('hidden');
+      calibrationPanel.replaceChildren();
+      calibrationPanel.classList.add('hidden');
+      riggingPanel.classList.remove('hidden');
     }
     return;
   }
   
+  document.getElementById('rigging-panel')?.classList.add('hidden');
   // Ferramenta Regiões - painel personalizado
   const region = app.calibrationSelectedRegionId ? app.pieceMap.getRegion(app.calibrationSelectedRegionId) : null;
   
-  if (!region) {
-    calibrationPanel.innerHTML = `
-      <div style="padding: 16px; color: #888; text-align: center;">
-        <p>Selecione uma região no canvas para ajustar.</p>
-        <p style="font-size: 12px; margin-top: 8px;">Use a ferramenta <strong>Regiões</strong> e clique numa região colorida.</p>
-      </div>
-    `;
+  if (app.calibrationTool === 'regions' && app.pieceMap.getAllRegions().some(r => r.raster)) {
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Região a corrigir');
+    select.add(new Option('Escolher região', ''));
+    for (const item of app.pieceMap.getAllRegions()) select.add(new Option(item.name, item.id));
+    select.value = region?.id || '';
+    select.onchange = () => {
+      app.calibrationSelectedRegionId = select.value;
+      app.pieceMap.selectRegion(select.value);
+      updateCalibrationPanel();
+    };
+    calibrationPanel.replaceChildren(select, document.createTextNode(' Shift + arrastar para pintar. Alt + arrastar para apagar.'));
     calibrationPanel.classList.remove('hidden');
     return;
   }
-  
+  if (!region) {
+    calibrationPanel.textContent = app.calibrationTool === 'regions' ? 'Selecione uma região no canvas para ajustar.' : '';
+    return;
+  }
   // Calcula bounding box da região para largura/altura
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const pt of region.points) {
@@ -2047,8 +2084,6 @@ function onPieceMapSelectionChange(region) {
     generateBtn.disabled = !region;
     if (!region) {
       generateBtn.title = 'Selecione uma região primeiro';
-    } else if (region.boneId !== 'cotovelo_esquerdo') {
-      generateBtn.title = 'Apenas cotovelo_esquerdo é suportado nesta fase';
     } else {
       generateBtn.title = 'Gerar Peça Real';
     }
@@ -2082,7 +2117,7 @@ function onTestMovementChange() {
   
   // Aplica rotação ao cotovelo_esquerdo se existir
   if (app.currentCharacterObject && app.currentCharacterObject.rig) {
-    const bone = app.currentCharacterObject.rig.getBone('cotovelo_esquerdo');
+    const bone = app.currentCharacterObject.rig.getBone(app.currentCharacterObject.pieceMap?.getSelectedRegion()?.boneId || 'l_elbow');
     if (bone) {
       bone.setLocalRotation(angle);
       app.currentCharacterObject.rig.computeWorldTransforms();
@@ -2101,7 +2136,7 @@ function resetTestMovement() {
   if (valueEl) valueEl.textContent = '0°';
   
   if (app.currentCharacterObject && app.currentCharacterObject.rig) {
-    const bone = app.currentCharacterObject.rig.getBone('cotovelo_esquerdo');
+    const bone = app.currentCharacterObject.rig.getBone(app.currentCharacterObject.pieceMap?.getSelectedRegion()?.boneId || 'l_elbow');
     if (bone) {
       bone.setLocalRotation(0);
       app.currentCharacterObject.rig.computeWorldTransforms();
@@ -2243,7 +2278,7 @@ function toggleEditPartsMode() {
 function enterEditPartsMode() {
   const obj = app.selectionManager.getSelectedObject();
   
-  if (!obj || !obj.partManager || app.partManager.getAllParts().length === 0) {
+  if (!obj || !obj.partManager || obj.partManager.getAllParts().length === 0) {
     alert('Não há peças para editar. Crie uma peça primeiro.');
     return;
   }
@@ -2259,6 +2294,7 @@ function enterEditPartsMode() {
     exitRiggingMode();
   }
   
+  app.currentCharacterObject = obj;
   app.isEditPartsMode = true;
   app.partManager = obj.partManager;
   
@@ -2372,6 +2408,7 @@ function setEditPartsTool(tool) {
  * Atualiza painel do Editor de Peças
  */
 function updateEditPartsPanel(selectedPart) {
+  setEditPartsTool(app.editPartsTool);
   if (!app.partManager) return;
   
   const propsForm = document.getElementById('properties-form');
@@ -2412,7 +2449,7 @@ function updateEditPartsPanel(selectedPart) {
              onmouseover="this.style.background='#2a3a4a'" 
              onmouseout="this.style.background='${p.id === selectedId ? '#2a4a6a' : 'transparent'}'">
           <div style="width: 14px; height: 14px; border-radius: 3px; margin-right: 10px; 
-                      background: ${p.color}; border: 1px solid ${p.color.replace('0.4', '0.8')}; flex-shrink: 0;"></div>
+                      background: ${app.currentCharacterObject?.pieceMap?.getRegion(p.boneId)?.color || '#6898b8'}; border: 1px solid #8396a4; flex-shrink: 0;"></div>
           <div style="flex: 1; min-width: 0;">
             <div style="color: #fff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${p.name}
@@ -2622,7 +2659,10 @@ function updatePartPropertiesPanel(part) {
       app.renderer.render(app.scene);
     };
     rotationInput.addEventListener('input', updateRotation);
-    rotationSlider.addEventListener('input', updateRotation);
+    rotationSlider.addEventListener('input', () => {
+      rotationInput.value = rotationSlider.value;
+      updateRotation();
+    });
   }
   if (scaleXInput) {
     scaleXInput.addEventListener('change', () => {
@@ -2722,12 +2762,6 @@ async function generatePieceFromMap() {
     return;
   }
   
-  // Verifica se é o antebraço esquerdo (para esta fase)
-  if (region.boneId !== 'cotovelo_esquerdo') {
-    const confirmMsg = `Esta fase só suporta o antebraço esquerdo (cotovelo_esquerdo).\nRegião selecionada: ${region.name}\n\nDeseja continuar mesmo assim?`;
-    if (!confirm(confirmMsg)) return;
-  }
-  
   try {
     updateStatus(`Gerando peça "${region.name}"...`);
     
@@ -2777,7 +2811,7 @@ async function generatePieceFromMap() {
     // Atualiza a transformação local usando o método correto da classe Part
     part.updateLocalTransform();
     
-    updateStatus(`Peça "${part.name}" gerada com sucesso! Pivô no cotovelo.`);
+    updateStatus(`Peça "${part.name}" gerada com sucesso! Pivô na articulação.`);
     
     // Oculta a região correspondente na imagem base (marca para ocultação futura)
     region.generated = true;
@@ -2866,32 +2900,18 @@ async function previewPieceFromMap(region) {
       }
     }
     
-    // Recorta a região da imagem original usando a máscara poligonal
     previewCtx.save();
-    
-    // Ajusta pontos do polígono para o canvas de preview
-    const adjustedPoints = mask.points.map(pt => ({
-      x: pt.x - bounds.x + margin,
-      y: pt.y - bounds.y + margin
-    }));
-    
-    previewCtx.beginPath();
-    previewCtx.moveTo(adjustedPoints[0].x, adjustedPoints[0].y);
-    for (let i = 1; i < adjustedPoints.length; i++) {
-      previewCtx.lineTo(adjustedPoints[i].x, adjustedPoints[i].y);
+    previewCtx.translate(margin - bounds.x, margin - bounds.y);
+    if (mask.type === 'raster') previewCtx.clip(rasterPath(mask));
+    else {
+      previewCtx.beginPath();
+      mask.points.forEach((point, i) => i ? previewCtx.lineTo(point.x, point.y) : previewCtx.moveTo(point.x, point.y));
+      previewCtx.closePath();
+      previewCtx.clip();
     }
-    previewCtx.closePath();
-    previewCtx.clip();
-    
-    // Desenha a região da imagem original
-    previewCtx.drawImage(
-      obj.imageElement,
-      bounds.x - margin, bounds.y - margin, bounds.width + margin * 2, bounds.height + margin * 2,
-      0, 0, canvasWidth, canvasHeight
-    );
-    
+    previewCtx.drawImage(obj.imageElement, 0, 0);
     previewCtx.restore();
-    
+
     // Converte para Data URL
     const previewDataURL = previewCanvas.toDataURL('image/png');
     
@@ -2969,8 +2989,7 @@ function showPreviewModal(dataURL, title) {
  * Atualiza painel de peças
  */
 function updatePartsPanel() {
-  // TODO: Implementar lista de peças no painel lateral
-  console.log('Peças:', app.partManager.getAllParts());
+  updatePieceCountDisplay();
 }
 
 /**
@@ -3120,7 +3139,7 @@ function updateCanvasInfo(screenX, screenY) {
 async function initializeSilhouetteAnalyzer() {
   if (!app.currentCharacterObject || !app.currentCharacterObject.imageElement) return;
   
-  if (!app.silhouetteAnalyzer) {
+  if (app.silhouetteAnalyzer?.imageElement !== app.currentCharacterObject.imageElement) {
     try {
       app.silhouetteAnalyzer = await createSilhouetteAnalyzer(app.currentCharacterObject, {
         alphaThreshold: 128,
@@ -3332,9 +3351,10 @@ async function startRecognition() {
     badgeEl.style.background = '#007acc';
   }
   
+  let recognizer;
   try {
     // Cria reconhecedor se não existir
-    if (!app.anatomicalRecognizer) {
+    if (app.anatomicalRecognizer?.characterObject !== app.currentCharacterObject) {
       app.anatomicalRecognizer = await createAnatomicalRecognizer(
         app.currentCharacterObject,
         app.silhouetteAnalyzer,
@@ -3344,7 +3364,9 @@ async function startRecognition() {
     }
     
     // Executa reconhecimento
-    const result = await app.anatomicalRecognizer.recognize({
+    recognizer = app.anatomicalRecognizer;
+    const result = await recognizer.recognize({
+      method: document.getElementById('recognition-method').value,
       onProgress: (percent, message) => {
         if (progressBarEl) progressBarEl.style.width = `${percent}%`;
         if (progressTextEl) progressTextEl.textContent = `${Math.round(percent)}%`;
@@ -3352,6 +3374,7 @@ async function startRecognition() {
       }
     });
     
+    if (recognizer !== app.anatomicalRecognizer) return;
     app.recognitionResult = result;
     
     // Gera visualização
@@ -3377,6 +3400,7 @@ async function startRecognition() {
         Não cobertos: <span style="color: #ff6666;">${q.uncoveredPixels}</span> | 
         Sobreposição: <span style="color: #ff66ff;">${q.overlappingPixels}</span> | 
         Fora: <span style="color: #ffff66;">${q.outsidePixels}</span>
+        <br>Atribuição correta: por validar. Regiões sem máscara: ${app.pieceMap.getAllRegions().filter(r => !result.masks.has(r.id)).map(r => r.name).join(', ') || 'nenhuma'}.
         <br>Regiões detectadas: ${Object.keys(q.regions).length}
       `;
     }
@@ -3385,9 +3409,11 @@ async function startRecognition() {
     app.renderer.render(app.scene);
     
   } catch (err) {
+    if (recognizer && (recognizer.cancelRequested || recognizer !== app.anatomicalRecognizer)) return;
     console.error('Erro no reconhecimento:', err);
     const readyEl = document.getElementById('recognition-ready');
     if (progressEl) progressEl.classList.add('hidden');
+    if (app.anatomicalRecognizer?.cancelRequested) return;
     if (readyEl) readyEl.classList.remove('hidden');
     if (errorEl) {
       errorEl.textContent = `Erro: ${err.message}`;
@@ -3398,6 +3424,7 @@ async function startRecognition() {
       badgeEl.style.background = '#dc3545';
     }
   } finally {
+    if (recognizer && recognizer !== app.anatomicalRecognizer) recognizer.dispose();
     app.isRecognizing = false;
   }
 }
@@ -3409,7 +3436,6 @@ function cancelRecognition() {
   if (app.anatomicalRecognizer) {
     app.anatomicalRecognizer.cancel();
   }
-  app.isRecognizing = false;
   
   const readyEl = document.getElementById('recognition-ready');
   const progressEl = document.getElementById('recognition-progress');
@@ -3439,30 +3465,12 @@ function applyRecognition() {
   const silW = app.silhouetteAnalyzer._alphaWidth;
   const silH = app.silhouetteAnalyzer._alphaHeight;
   
-  // Para cada máscara, converte para pontos poligonais e atualiza PieceMap
-  // Isso é uma simplificação - na prática, faríamos vectorização das máscaras
   const regions = app.pieceMap.getAllRegions();
-  
   for (const region of regions) {
     const mask = masks.get(region.id);
-    if (mask) {
-      // Converte máscara para pontos (simplificado: usa bounding box da máscara)
-      const points = maskToPolygonPoints(mask, silW, silH);
-      if (points && points.length >= 3) {
-        // Transforma pontos de volta para espaço local do personagem
-        const localPoints = points.map(p => {
-          return app.silhouetteAnalyzer.screenToCharacterLocal(
-            p.x * (app.currentCharacterObject.imageWidth / silW),
-            p.y * (app.currentCharacterObject.imageHeight / silH)
-          );
-        });
-        
-        region.points = localPoints;
-        region.originalPoints = localPoints.map(p => ({ x: p.x, y: p.y }));
-      }
-    }
+    region.raster = mask ? encodeRegion(mask, silW, silH) : { type: 'raster', rows: {} };
   }
-  
+
   // Notifica mudança
   if (app.pieceMap.onRegionChange) {
     for (const region of regions) {
@@ -3485,60 +3493,6 @@ function applyRecognition() {
   }
   
   updateStatus('Reconhecimento anatómico aplicado às regiões');
-}
-
-/**
- * Converte máscara binária para pontos poligonais (aproximação simples)
- */
-function maskToPolygonPoints(mask, width, height) {
-  const points = [];
-  const step = Math.max(1, Math.floor(Math.sqrt(width * height) / 50)); // Amostra ~50 pontos
-  
-  // Encontra contorno usando marching squares simplificado
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const idx = y * width + x;
-      if (mask[idx]) {
-        // Verifica se é borda (tem vizinho transparente)
-        let isEdge = false;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const nx = x + dx * step;
-            const ny = y + dy * step;
-            if (nx < 0 || nx >= width || ny < 0 || ny >= height || !mask[ny * width + nx]) {
-              isEdge = true;
-              break;
-            }
-          }
-          if (isEdge) break;
-        }
-        if (isEdge) {
-          points.push({ x, y });
-        }
-      }
-    }
-  }
-  
-  // Ordena pontos angularmente em torno do centro
-  if (points.length < 3) return null;
-  
-  const cx = points.reduce((a, p) => a + p.x, 0) / points.length;
-  const cy = points.reduce((a, p) => a + p.y, 0) / points.length;
-  
-  points.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-  
-  // Simplifica (remove pontos muito próximos)
-  const simplified = [];
-  const minDist = 2;
-  for (const p of points) {
-    if (simplified.length === 0 || 
-        Math.hypot(p.x - simplified[simplified.length - 1].x, p.y - simplified[simplified.length - 1].y) > minDist) {
-      simplified.push(p);
-    }
-  }
-  
-  return simplified.length >= 3 ? simplified : null;
 }
 
 /**

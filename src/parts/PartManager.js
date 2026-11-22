@@ -1,3 +1,5 @@
+import { PartRenderer } from './PartRenderer.js';
+import { rasterPath } from '../segmentation/RasterRegion.js';
 /**
  * PartManager - Gerencia as peças recortadas de um personagem
  * Responsável por coordenar partes, calcular transformações mundiais,
@@ -29,9 +31,7 @@ export class PartManager {
     this.isCuttingMode = false;
     this.cuttingData = null;
     
-    // Referências
-    this.rigRenderer = null;
-    this.renderer = null;
+    this.setReferences(rigRenderer, renderer);
     
     // Callbacks
     this.onSelectionChange = null;
@@ -68,7 +68,7 @@ export class PartManager {
     
     // Calcula bounds da máscara em coordenadas da imagem original
     let bounds;
-    if (mask.type === 'rect') {
+    if (mask.type === 'rect' || mask.type === 'raster') {
       bounds = mask.bounds;
     } else if (mask.type === 'polygon') {
       // Calcula bounding box do polígono
@@ -90,7 +90,11 @@ export class PartManager {
     canvas.height = bounds.height + 4;
     
     // Para polígono: cria canvas transparente e aplica clip ANTES de desenhar
-    if (mask.type === 'polygon') {
+    if (mask.type === 'raster') {
+      ctx.translate(margin - bounds.x, margin - bounds.y);
+      ctx.clip(rasterPath(mask));
+      ctx.drawImage(characterObject.imageElement, 0, 0);
+    } else if (mask.type === 'polygon') {
       // Calcula pontos ajustados para o canvas (com margem)
       const adjustedPoints = [];
       for (const pt of mask.points) {
@@ -130,77 +134,32 @@ export class PartManager {
     // Calcula o pivot correto para que a articulação (joint) coincida com o pivot na textura
     // A posição local da peça deve ser (0,0) para que o pivot coincida com a articulação
     
-    // 1. Centro da peça em coordenadas da imagem (PNG)
-    const pieceCenterImgX = bounds.x + bounds.width / 2;
-    const pieceCenterImgY = bounds.y + bounds.height / 2;
-    
-    // 2. Centro da peça em coordenadas locais do personagem (origem no centro da imagem)
-    const charCenterX = this.characterObject.imageWidth / 2;
-    const charCenterY = this.characterObject.imageHeight / 2;
-    const pieceCenterCharX = pieceCenterImgX - charCenterX;
-    const pieceCenterCharY = pieceCenterImgY - charCenterY;
-    
-    // 3. Converte para coordenadas mundiais
-    const charTransform = this.characterObject.transform;
-    const rigBaseTransform = this.rig?.baseTransform || createTransform();
-    const charRigTransform = new Transform2D();
-    charRigTransform.multiply(charTransform);
-    charRigTransform.multiply(rigBaseTransform);
-    const pieceCenterWorld = charRigTransform.transformPoint(pieceCenterCharX, pieceCenterCharY);
-    
-    // 4. Posição da articulação (joint) do osso em coordenadas mundiais
-    const jointWorld = bone.getWorldPoint();
-    
-    // 5. Converte a posição da articulação para coordenadas da imagem
-    // Inverte a transformação charRig para obter coordenadas locais do personagem
-    const charRigInv = charRigTransform.getInverse();
-    const jointChar = charRigInv.transformPoint(jointWorld.x, jointWorld.y);
-    const imgCenterX = this.characterObject.imageWidth / 2;
-    const imgCenterY = this.characterObject.imageHeight / 2;
-    const jointImgX = jointChar.x + charCenterX;
-    const jointImgY = jointChar.y + charCenterY;
-    
-    // 3. Calcula pivot na textura da peça (coordenadas 0-1)
-    // A textura tem margem de 2px em cada lado
-    const texWidth = bounds.width + 4;
-    const texHeight = bounds.height + 4;
-    
-    // Posição da articulação na textura (pixels a partir do canto superior esquerdo da textura)
-    const jointTexX = jointImgX - bounds.x + 2;
-    const jointTexY = jointImgY - bounds.y + 2;
-    
-    // Pivot em coordenadas normalizadas (0-1)
-    const pivotX = jointTexX / texWidth;
-    const pivotY = jointTexY / texHeight;
-    
-    // Posição local da peça: (0,0) para que o pivot coincida com a articulação do osso
-    const localX = 0;
-    const localY = 0;
-    
+    const joint = bone.getWorldPoint();
+    const pivotX = (joint.x + characterObject.imageWidth / 2 - bounds.x + margin) / canvas.width;
+    const pivotY = (joint.y + characterObject.imageHeight / 2 - bounds.y + margin) / canvas.height;
     // Cria a peça
     const part = new Part({
       name,
       sourceObjectId: this.characterObject.id,
       boneId,
       mask,
-      localPosition: { x: localX, y: localY },
+      localPosition: { x: 0, y: 0 },
       pivot: { 
-        x: Math.max(0, Math.min(1, pivotX)), 
-        y: Math.max(0, Math.min(1, pivotY)) 
+        x: pivotX,
+        y: pivotY
       }, // Pivot calculado para alinhar articulação com textura
       zIndex: this.getNextZIndex()
     });
     
     // Define imageData depois de criar o canvas
-    part.imageData = canvas.toDataURL('image/png');
-    part.imageWidth = bounds.width + 4; // com margem
-    part.imageHeight = bounds.height + 4;
+    part.imageData = imageData;
+    part.imageWidth = canvas.width; // com margem
+    part.imageHeight = canvas.height;
     
     // Carrega a imagem
     await part.loadImage();
     
-    // Calcula pivot (centro da peça)
-    part.pivot = { x: 0.5, y: 0.5 };
+
     
     // Adiciona ao manager
     this.addPart(part);
@@ -551,28 +510,9 @@ export class PartManager {
   hitTestPart(screenX, screenY) {
     if (!this.renderer) return null;
     
-    const canvas = this.renderer.canvas;
-    const rect = canvas.getBoundingClientRect();
-    const x = screenX - rect.left;
-    const y = screenY - rect.top;
-    
-    // Testa em ordem reversa (topo primeiro)
-    const parts = this.getPartsForRendering().reverse();
-    
-    for (const part of parts) {
-      if (!part.visible || !part.imageElement) continue;
-      
-      // Converte para coordenadas locais da peça
-      // Simplificado: usa hit test retangular
-      const rect = canvas.getBoundingClientRect();
-      const screenX = screenX - rect.left;
-      const screenY = screenY - rect.top;
-      
-      // TODO: hit test preciso com transformações
-      // Por enquanto, usa bounding box aproximado
-    }
-    
-    return null;
+    const rect = this.renderer.canvas.getBoundingClientRect();
+    return new PartRenderer(this.renderer).hitTestPart(this, this.characterObject,
+      screenX - rect.left, screenY - rect.top);
   }
   
   /**
