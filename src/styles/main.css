@@ -742,6 +742,356 @@ body {
   display: block;
 }
 
+/* When calibration mode is active, show toolbar and hide normal panels */
+.calibration-mode-active .calibration-toolbar {
+  display: flex;
+}
+
+.calibration-mode-active #no-selection,
+.calibration-mode-active #properties-form,
+.calibration-mode-active #rigging-panel,
+.calibration-mode-active #piece-map-toolbar,
+.calibration-mode-active #edit-parts-toolbar,
+.calibration-mode-active #test-movement-controls {
+  display: none;
+}
+
+.calibration-mode-active #calibration-panel {
+  display: block;
+}
+
+/* ===== CALIBRAR ARMADURA - TOOLBAR FIXA ===== */
+
+.calibration-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.calibration-toolbar.hidden {
+  display: none;
+}
+
+.calibration-tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.calibration-tool-grid .btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 6px;
+  min-height: 72px;
+  justify-content: center;
+}
+
+.calibration-tool-grid .btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+.calibration-tool-grid .btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.calibration-tool-grid .btn span {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.calibration-toolbar .toolbar-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calibration-toolbar .toolbar-group .btn {
+  padding: 6px 12px;
+}
+
+.calibration-toolbar .toolbar-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-top: 4px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+
+/* Painel de Cobertura */
+.coverage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.coverage-panel.hidden {
+  display: none;
+}
+
+.coverage-panel .panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coverage-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.coverage-panel .panel-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.coverage-panel .stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.coverage-panel .stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.coverage-panel .stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.coverage-panel .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.coverage-panel .stat-value.uncovered { color: #ff6666; }
+.coverage-panel .stat-value.overlapping { color: #ff66ff; }
+.coverage-panel .stat-value.outside { color: #ffff66; }
+.coverage-panel .stat-value.covered { color: #66ff66; }
+
+.coverage-panel .control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coverage-panel .control-row label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.coverage-panel .checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.coverage-panel .checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* Painel de Reconhecimento */
+.recognition-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.recognition-panel.hidden {
+  display: none;
+}
+
+.recognition-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.recognition-panel .panel-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recognition-panel .progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recognition-panel .progress-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recognition-panel .progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.recognition-panel .progress-bar .fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.recognition-panel .progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 40px;
+}
+
+.recognition-panel .progress-message {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.recognition-panel .results-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.recognition-panel .action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recognition-panel .action-buttons .btn {
+  flex: 1;
+  min-width: 130px;
+}
+
+.recognition-panel .hint-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.recognition-panel .error-message {
+  color: #ff6666;
+  font-size: 12px;
+  padding: 8px;
+  background: rgba(255, 102, 102, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 102, 102, 0.3);
+}
+
+.recognition-panel .ready-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.recognition-panel .ready-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.recognition-panel .ready-state .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.recognition-panel .ready-state .btn svg {
+  flex-shrink: 0;
+}
+
+.badge {
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Right panel improvements for calibration mode */
+.calibration-mode-active .panel-right {
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.calibration-mode-active .panel-content {
+  overflow-y: auto;
+}
+
+
+
+/* Painel do Calibrar Armadura */
+.calibration-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.calibration-panel.hidden {
+  display: none;
+}
+
 /* Painel do Editor de Peças */
 .edit-parts-panel {
   display: none;

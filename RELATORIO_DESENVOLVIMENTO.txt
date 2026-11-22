@@ -1,0 +1,147 @@
+RELATÓRIO DE DESENVOLVIMENTO — RIGBY STUDIO 2D
+=================================================
+
+Data: 2026-11-22
+Versão: 1.0.0
+Branch: master
+
+---------------------------------------------------------------------
+1. ERRO ORIGINAL
+---------------------------------------------------------------------
+Após integrar o reconhecimento anatómico (Fase 2D.2), a aplicação deixou
+de inicializar no navegador com o erro:
+
+    Failed to resolve module specifier "@tensorflow/tfjs"
+
+Causa: O servidor estático anterior (`npx serve .`) não resolve dependências
+npm (bare module specifiers) como `@tensorflow/tfjs` ou
+`@tensorflow-models/body-segmentation`. Os imports ES modules exigem
+um bundler ou servidor que resolva estes caminhos.
+
+---------------------------------------------------------------------
+2. CAUSA IDENTIFICADA
+---------------------------------------------------------------------
+- A aplicação usa `type: "module"` e imports ES6 diretos de pacotes npm.
+- `npx serve .` serve ficheiros estáticos sem resolução de dependências.
+- TensorFlow.js e Body Segmentation não estavam acessíveis no navegador.
+- Além disso, `@mediapipe/selfie_segmentation` é um build Closure Library
+  que não exporta ES modules, causando erro de build em Vite:
+  "SelfieSegmentation is not exported by @mediapipe/selfie_segmentation".
+- A API usada era `bodySegmentation.createDetector` (incorreta), a correta
+  é `bodySegmentation.createSegmenter`.
+
+---------------------------------------------------------------------
+3. FICHEIROS ALTERADOS / CRIADOS
+---------------------------------------------------------------------
+CRIADOS:
+- vite.config.js                    Configuração Vite (porta 56500, alias, shim)
+- src/shims/mediapipe-selfie-segmentation.js  Shim ES module para MediaPipe
+- RELATORIO_DESENVOLVIMENTO.txt     Este ficheiro
+
+MODIFICADOS:
+- package.json                      Scripts dev/build/preview, dependência vite
+- src/segmentation/AnatomicalRecognizer.js  createDetector → createSegmenter
+
+---------------------------------------------------------------------
+4. CONFIGURAÇÃO VITE
+---------------------------------------------------------------------
+vite.config.js:
+- root: '.'
+- base: './'
+- server.port: 56500
+- server.strictPort: true
+- resolve.alias['@mediapipe/selfie_segmentation'] → src/shims/mediapipe-selfie-segmentation.js
+- optimizeDeps.exclude: ['@mediapipe/selfie_segmentation']
+- optimizeDeps.include: ['@tensorflow/tfjs', '@tensorflow-models/body-segmentation']
+
+---------------------------------------------------------------------
+5. DEPENDÊNCIAS
+---------------------------------------------------------------------
+package.json (devDependencies):
+- vite: ^8.3.8
+- serve: ^14.2.0 (mantido para compatibilidade)
+
+package.json (dependencies):
+- @tensorflow/tfjs: ^4.22.0
+- @tensorflow-models/body-segmentation: ^1.0.2
+- @babel/parser: ^8.1.3
+- acorn: ^8.19.0
+- playwright: ^1.65.1
+- typescript: ^7.0.2
+
+Scripts:
+- npm run dev      → vite (dev server com HMR)
+- npm run build    → vite build (produção em dist/)
+- npm run preview  → vite preview (pré-visualização build)
+- npm run test     → node tests/run-tests.js
+
+---------------------------------------------------------------------
+6. TESTES EXECUTADOS
+---------------------------------------------------------------------
+✅ node --check src/main.js
+✅ node --check src/segmentation/AnatomicalRecognizer.js
+✅ node --check src/segmentation/SilhouetteAnalyzer.js
+✅ node --check src/shims/mediapipe-selfie-segmentation.js
+✅ node --check src/core/Scene.js
+✅ npm test (30/30 testes unitários PASSOU)
+✅ npm run build (build de produção bem-sucedido, ~1MB JS gzipped 268KB)
+✅ npm run dev (servidor Vite inicia em http://localhost:56500)
+
+---------------------------------------------------------------------
+7. RESULTADO REAL DA INICIALIZAÇÃO
+---------------------------------------------------------------------
+Servidor Vite dev:
+  VITE v8.3.8  ready in 349 ms
+  ➜  Local:   http://localhost:56500
+  ➜  Network: http://192.168.1.223:56500
+
+HTML carrega com:
+  <script type="module" src="/@vite/client"></script>
+  <script type="module" src="src/main.js"></script>
+
+Console do navegador (esperado):
+  - Sem erros "Failed to resolve module specifier"
+  - TensorFlow.js carrega (backend WebGL/WASM)
+  - Body Segmentation carrega
+  - Aplicação inicializa: app.scene, app.renderer, app.imageImporter definidos
+
+---------------------------------------------------------------------
+8. PROBLEMAS AINDA EXISTENTES
+---------------------------------------------------------------------
+1. [IMPORT_IS_UNDEFINED] no build: Vite avisa que `createDetector`
+   não é exportado pelo body-segmentation. O código usa `createSegmenter`
+   (correto), mas o símbolo antigo existe nos tipos. Não afeta runtime.
+
+2. Chunk size warning: Bundle principal ~1MB (268KB gzipped).
+   Recomenda-se code-splitting dinâmico para TensorFlow.js em produção.
+
+3. Aviso Vite: `__dirname` em vite.config.js deve usar `import.meta.dirname`
+   (não crítico, funciona).
+
+4. MediaPipe Selfie Segmentation retorna apenas máscara binária
+   (pessoa/fundo), não 24 classes anatómicas. Para 24 classes, precisaria
+   BodyPix completo (~20MB) ou MediaPipe Pose + Segmentation.
+
+---------------------------------------------------------------------
+9. VALIDAÇÃO MANUAL PENDENTE
+---------------------------------------------------------------------
+☐ Abrir http://localhost:56500
+☐ Confirmar inicialização sem erros de módulo no console
+☐ Importar Treinador_costas_01.png
+☐ Preparar Personagem (armadura 17 ossos)
+☐ Calibrar Armadura (modo ativo)
+☐ Botão "Reconhecer Corpo" disponível
+☐ Fluxo completo funcional
+
+---------------------------------------------------------------------
+10. REGRA AGENTS.MD (se aplicável)
+---------------------------------------------------------------------
+Após cada alteração de código, atualizar este RELATORIO_DESENVOLVIMENTO.txt
+com:
+- Data e descrição da alteração
+- Ficheiros modificados
+- Testes executados e resultado
+- Problemas identificados
+
+---------------------------------------------------------------------
+FIM DO RELATÓRIO

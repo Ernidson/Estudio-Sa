@@ -6,6 +6,7 @@ import { Transform2D, createTransform } from './Transform2D.js';
 import { generateId } from '../editor/ImageImporter.js';
 import { Rig } from '../rigging/Rig.js';
 import { PartManager } from '../parts/PartManager.js';
+import { PieceMap } from '../parts/PieceMap.js';
 
 export class SceneObject {
   constructor(data = {}) {
@@ -33,6 +34,9 @@ export class SceneObject {
 
     // Partes recortadas (Fase 2B)
     this.partManager = data.parts ? PartManager.fromJSON(data.parts, this, this.rig) : null;
+
+    // Mapa de Peças / Calibração (Fase 2C)
+    this.pieceMap = data.pieceMap ? PieceMap.fromJSON(data.pieceMap, this, this.rig, null) : null;
   }
 
   /**
@@ -120,7 +124,8 @@ export class SceneObject {
       transform: this.transform.toJSON(),
       layerOrder: this.layerOrder,
       rig: this.rig ? this.rig.toJSON() : null,
-      parts: this.partManager ? this.partManager.toJSON() : null
+      parts: this.partManager ? this.partManager.toJSON() : null,
+      pieceMap: this.pieceMap ? this.pieceMap.toJSON() : null
     };
   }
 

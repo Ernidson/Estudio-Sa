@@ -14,6 +14,9 @@ import { estimateRigForImage, detectBestPreset } from './rigging/RigEstimator.js
 import { PartManager } from './parts/PartManager.js';
 import { PartRenderer } from './parts/PartRenderer.js';
 import { PieceMap } from './parts/PieceMap.js';
+import { SilhouetteAnalyzer, createSilhouetteAnalyzer } from './segmentation/SilhouetteAnalyzer.js';
+import { AnatomicalRecognizer, createAnatomicalRecognizer } from './segmentation/AnatomicalRecognizer.js';
+import { Transform2D } from './core/Transform2D.js';
 
 // Estado global da aplicação
 const app = {
@@ -46,7 +49,24 @@ const app = {
   // Editor de Peças (Fase 2B.3)
   isEditPartsMode: false,
   editPartsSelectedPartId: null,
-  editPartsTool: 'select'
+  editPartsTool: 'select',
+  
+  // Calibrar Armadura (Fase 2C)
+  isCalibrationMode: false,
+  calibrationTool: 'joints', // 'joints' ou 'regions'
+  calibrationSelectedRegionId: null,
+  
+  // Silhouette Analyzer (Fase 2D)
+  silhouetteAnalyzer: null,
+  showCoverageVisualization: false,
+  coverageVisualizationCanvas: null,
+  
+  // Anatomical Recognizer (Fase 2D.2)
+  anatomicalRecognizer: null,
+  isRecognizing: false,
+  recognitionResult: null,
+  recognitionVisualizationCanvas: null,
+  previousPieceMapState: null // Para permitir reverter
 };
 
 /**
@@ -181,6 +201,21 @@ function renderLoop() {
   // Render Mapa de Peças
   if (app.isPieceMapMode && app.pieceMap) {
     app.pieceMap.draw(app.renderer.ctx, app.renderer.viewport);
+  }
+  
+  // Render Calibrar Armadura (mostra regiões e articulações)
+  if (app.isCalibrationMode && app.pieceMap) {
+    app.pieceMap.draw(app.renderer.ctx, app.renderer.viewport);
+  }
+  
+  // Render Cobertura Anatómica (Fase 2D)
+  if (app.isCalibrationMode && app.calibrationTool === 'coverage' && app.coverageVisualizationCanvas) {
+    drawCoverageVisualization();
+  }
+  
+  // Render Reconhecimento Anatómico (Fase 2D.2)
+  if (app.isCalibrationMode && app.calibrationTool === 'recognize' && app.recognitionVisualizationCanvas) {
+    drawRecognitionVisualization();
   }
   
   requestAnimationFrame(renderLoop);
@@ -339,6 +374,54 @@ function setupEventListeners() {
   document.getElementById('btn-reset-part-adjustments').addEventListener('click', resetPartAdjustments);
   document.getElementById('btn-delete-part').addEventListener('click', deleteSelectedPart);
 
+  // Calibrar Armadura (Fase 2C)
+  document.getElementById('btn-calibrate-armor').addEventListener('click', toggleCalibrationMode);
+  document.getElementById('btn-exit-calibration').addEventListener('click', exitCalibrationMode);
+  document.getElementById('calib-tool-joints').addEventListener('click', () => setCalibrationTool('joints'));
+  document.getElementById('calib-tool-regions').addEventListener('click', () => setCalibrationTool('regions'));
+  document.getElementById('calib-tool-coverage').addEventListener('click', () => setCalibrationTool('coverage'));
+  document.getElementById('calib-tool-recognize').addEventListener('click', () => setCalibrationTool('recognize'));
+
+  // Reconhecimento Anatómico controls
+  const btnCancelRecognition = document.getElementById('btn-cancel-recognition');
+  if (btnCancelRecognition) {
+    btnCancelRecognition.addEventListener('click', cancelRecognition);
+  }
+  const btnApplyRecognition = document.getElementById('btn-apply-recognition');
+  if (btnApplyRecognition) {
+    btnApplyRecognition.addEventListener('click', applyRecognition);
+  }
+  const btnCancelRecognitionResult = document.getElementById('btn-cancel-recognition-result');
+  if (btnCancelRecognitionResult) {
+    btnCancelRecognitionResult.addEventListener('click', cancelRecognitionResult);
+  }
+  const btnStartRecognition = document.getElementById('btn-start-recognition');
+  if (btnStartRecognition) {
+    btnStartRecognition.addEventListener('click', startRecognition);
+  }
+
+  // Cobertura Anatómica controls
+  const coverageAlphaThreshold = document.getElementById('coverage-alpha-threshold');
+  if (coverageAlphaThreshold) {
+    coverageAlphaThreshold.addEventListener('input', onCoverageAlphaThresholdChange);
+  }
+  const coverageShowUncovered = document.getElementById('coverage-show-uncovered');
+  if (coverageShowUncovered) {
+    coverageShowUncovered.addEventListener('change', updateCoverageVisualization);
+  }
+  const coverageShowOverlapping = document.getElementById('coverage-show-overlapping');
+  if (coverageShowOverlapping) {
+    coverageShowOverlapping.addEventListener('change', updateCoverageVisualization);
+  }
+  const coverageShowOutside = document.getElementById('coverage-show-outside');
+  if (coverageShowOutside) {
+    coverageShowOutside.addEventListener('change', updateCoverageVisualization);
+  }
+  const coverageShowRegions = document.getElementById('coverage-show-regions');
+  if (coverageShowRegions) {
+    coverageShowRegions.addEventListener('change', updateCoverageVisualization);
+  }
+
   // Testar Movimento controls
   const testMovementSlider = document.getElementById('test-movement-slider');
   if (testMovementSlider) {
@@ -409,6 +492,34 @@ function onMouseDown(e) {
       updatePartPropertiesPanel(hitPart);
       e.preventDefault();
       return;
+    }
+  }
+
+  // Modo Calibrar Armadura
+  if (app.isCalibrationMode && app.pieceMap && app.currentCharacterObject) {
+    if (app.calibrationTool === 'regions') {
+      // Tenta iniciar arraste de ponto de controlo
+      if (app.pieceMap.startDragPoint(x, y)) {
+        e.preventDefault();
+        return;
+      }
+      
+      // Tenta selecionar região
+      const hitRegion = app.pieceMap.hitTestRegion(x, y);
+      if (hitRegion) {
+        app.pieceMap.selectRegion(hitRegion);
+        app.calibrationSelectedRegionId = hitRegion;
+        updateCalibrationPanel();
+        e.preventDefault();
+        return;
+      }
+    } else if (app.calibrationTool === 'joints') {
+      // Delega para rig editor para seleção e arraste de articulações
+      const handled = app.rigEditor.handleMouseDown(x, y);
+      if (handled) {
+        e.preventDefault();
+        return;
+      }
     }
   }
 
@@ -504,6 +615,25 @@ function onMouseMove(e) {
     return;
   }
 
+  // Modo Calibrar Armadura
+  if (app.isCalibrationMode && app.pieceMap && app.currentCharacterObject) {
+    if (app.calibrationTool === 'regions') {
+      if (app.pieceMap.isEditing) {
+        app.pieceMap.dragPoint(x, y);
+      } else {
+        app.pieceMap.updateHover(x, y);
+      }
+      updateCanvasInfo(x, y);
+      return;
+    } else if (app.calibrationTool === 'joints') {
+      const handled = app.rigEditor.handleMouseMove(x, y);
+      if (handled) {
+        updateCanvasInfo(x, y);
+        return;
+      }
+    }
+  }
+
   // Modo rigging: delega para rig editor
   if (app.isRiggingMode && app.rigEditor) {
     const handled = app.rigEditor.handleMouseMove(x, y);
@@ -564,6 +694,23 @@ function onMouseUp(e) {
     app.isMouseDown = false;
     app.canvas.style.cursor = 'default';
     return;
+  }
+
+  // Modo Calibrar Armadura
+  if (app.isCalibrationMode && app.pieceMap) {
+    if (app.calibrationTool === 'regions' && app.pieceMap.isEditing) {
+      app.pieceMap.endDragPoint();
+    }
+    app.isMouseDown = false;
+    app.canvas.style.cursor = 'crosshair';
+    return;
+  } else if (app.isCalibrationMode && app.calibrationTool === 'joints' && app.rigEditor) {
+    const handled = app.rigEditor.handleMouseUp(x, y);
+    if (handled) {
+      app.isMouseDown = false;
+      app.canvas.style.cursor = 'crosshair';
+      return;
+    }
   }
 
   // Modo rigging: delega para rig editor
@@ -995,6 +1142,7 @@ function updateRiggingModeUI(enabled) {
   const exitBtn = document.getElementById('btn-exit-rigging');
   const cutBtn = document.getElementById('btn-cut-piece');
   const pieceMapBtn = document.getElementById('btn-piece-map');
+  const calibBtn = document.getElementById('btn-calibrate-armor');
   const pieceMapToolbar = document.getElementById('piece-map-toolbar');
   const testMovementControls = document.getElementById('test-movement-controls');
   
@@ -1012,6 +1160,10 @@ function updateRiggingModeUI(enabled) {
   // Botão "Mapa de Peças" aparece quando há armadura ativa
   if (pieceMapBtn) {
     pieceMapBtn.style.display = enabled ? 'inline-flex' : 'none';
+  }
+  // Botão "Calibrar Armadura" aparece quando há armadura ativa
+  if (calibBtn) {
+    calibBtn.style.display = enabled ? 'inline-flex' : 'none';
   }
   // Esconde toolbar do Mapa de Peças no modo rigging
   if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
@@ -1373,6 +1525,510 @@ function updatePieceMapModeUI(enabled) {
 }
 
 /**
+ * Alterna modo Calibrar Armadura
+ */
+function toggleCalibrationMode() {
+  if (app.isCalibrationMode) {
+    exitCalibrationMode();
+  } else {
+    enterCalibrationMode();
+  }
+}
+
+/**
+ * Entra no modo Calibrar Armadura
+ */
+function enterCalibrationMode() {
+  const obj = app.selectionManager.getSelectedObject();
+  
+  if (!obj || !obj.hasRig || !obj.rig) {
+    alert('Selecione um personagem com armadura preparada.');
+    return;
+  }
+  
+  // Garante que outros modos estão desativados
+  if (app.isPieceMapMode) {
+    exitPieceMapMode();
+  }
+  if (app.isCuttingMode) {
+    exitCuttingMode();
+  }
+  if (app.isEditPartsMode) {
+    exitEditPartsMode();
+  }
+  if (app.isRiggingMode) {
+    exitRiggingMode();
+  }
+  
+  // Cria ou reutiliza PieceMap (persistido no objeto do personagem)
+  if (!obj.pieceMap) {
+    obj.pieceMap = new PieceMap(obj, obj.rig, app.renderer);
+    obj.pieceMap.generateRegions();
+  } else {
+    obj.pieceMap.characterObject = obj;
+    obj.pieceMap.rig = obj.rig;
+    obj.pieceMap.renderer = app.renderer;
+    // NÃO regenera regiões - preserva ajustes manuais
+  }
+  
+  app.pieceMap = obj.pieceMap;
+  app.currentCharacterObject = obj;
+  
+  // Configura callbacks
+  app.pieceMap.onSelectionChange = onCalibrationRegionSelectionChange;
+  app.pieceMap.onRegionChange = onCalibrationRegionChange;
+  
+  // Configura rig editor para o modo de articulações
+  app.rigEditor.setEnabled(true, obj.rig, obj);
+  app.rigEditor.onSelectionChange = onCalibrationBoneSelectionChange;
+  
+  // Ativa modo
+  app.isCalibrationMode = true;
+  app.calibrationTool = 'joints'; // Começa com Articulações
+  app.calibrationSelectedRegionId = null;
+  
+  // Atualiza UI
+  updateCalibrationModeUI(true);
+  updateStatus('Calibrar Armadura: selecione uma articulação ou região para ajustar');
+  
+  // Esconde painel de rigging
+  const riggingPanel = document.getElementById('rigging-panel');
+  if (riggingPanel) riggingPanel.classList.add('hidden');
+  
+  // Mostra painel de calibração
+  showCalibrationPanel();
+  
+  // Atualiza painel lateral
+  updateCalibrationPanel();
+}
+
+/**
+ * Sai do modo Calibrar Armadura
+ */
+function exitCalibrationMode() {
+  if (!app.isCalibrationMode) return;
+  
+  app.isCalibrationMode = false;
+  app.calibrationSelectedRegionId = null;
+  app.calibrationTool = 'joints';
+  // NÃO destrói o PieceMap - fica persistido no characterObject
+  app.pieceMap = null;
+  app.currentCharacterObject = null;
+  // Limpa estado de cobertura
+  app.coverageVisualizationCanvas = null;
+  if (app._coverageUpdateTimeout) {
+    clearTimeout(app._coverageUpdateTimeout);
+  }
+  // Limpa estado de reconhecimento
+  app.recognitionVisualizationCanvas = null;
+  app.recognitionResult = null;
+  app.previousPieceMapState = null;
+  if (app.anatomicalRecognizer) {
+    app.anatomicalRecognizer.dispose();
+    app.anatomicalRecognizer = null;
+  }
+  
+  // Desabilita rig editor
+  app.rigEditor.setEnabled(false);
+  app.rigEditor.onSelectionChange = onRigBoneSelectionChange; // Restaura callback original
+  
+  updateCalibrationModeUI(false);
+  updateStatus('Calibrar Armadura desativado');
+  
+  // Esconde toolbar e painel de calibração
+  const calibrationToolbar = document.getElementById('calibration-toolbar');
+  if (calibrationToolbar) calibrationToolbar.classList.add('hidden');
+  const calibrationPanel = document.getElementById('calibration-panel');
+  if (calibrationPanel) calibrationPanel.classList.add('hidden');
+  const coveragePanel = document.getElementById('coverage-panel');
+  if (coveragePanel) coveragePanel.classList.add('hidden');
+  const recognitionPanel = document.getElementById('recognition-panel');
+  if (recognitionPanel) recognitionPanel.classList.add('hidden');
+  
+  // Restaura painel de rigging
+  showRiggingPanel();
+}
+
+/**
+ * Define a ferramenta ativa no modo Calibrar Armadura
+ */
+function setCalibrationTool(tool) {
+  if (!app.isCalibrationMode) return;
+  
+  app.calibrationTool = tool;
+  
+  const jointsBtn = document.getElementById('calib-tool-joints');
+  const regionsBtn = document.getElementById('calib-tool-regions');
+  const coverageBtn = document.getElementById('calib-tool-coverage');
+  const recognizeBtn = document.getElementById('calib-tool-recognize');
+  const coveragePanel = document.getElementById('coverage-panel');
+  const recognitionPanel = document.getElementById('recognition-panel');
+  
+  if (jointsBtn) jointsBtn.classList.toggle('active', tool === 'joints');
+  if (regionsBtn) regionsBtn.classList.toggle('active', tool === 'regions');
+  if (coverageBtn) coverageBtn.classList.toggle('active', tool === 'coverage');
+  if (recognizeBtn) recognizeBtn.classList.toggle('active', tool === 'recognize');
+  
+  // Mostra/esconde painéis
+  if (coveragePanel) {
+    coveragePanel.classList.toggle('hidden', tool !== 'coverage');
+  }
+  if (recognitionPanel) {
+    recognitionPanel.classList.toggle('hidden', tool !== 'recognize');
+  }
+  
+  // Atualiza painel lateral
+  updateCalibrationPanel();
+  
+  const statusEl = document.getElementById('calibration-status');
+  if (statusEl) {
+    if (tool === 'joints') {
+      statusEl.textContent = 'Clique numa articulação para selecionar e arrastar';
+    } else if (tool === 'regions') {
+      statusEl.textContent = 'Clique numa região para selecionar, arraste os vértices para ajustar';
+    } else if (tool === 'coverage') {
+      statusEl.textContent = 'Visualizando cobertura anatómica — ajuste o limiar alfa se necessário';
+      initializeSilhouetteAnalyzer();
+    } else if (tool === 'recognize') {
+      statusEl.textContent = 'Reconhecimento anatómico automático — clique em Reconhecer Corpo para iniciar';
+      initializeSilhouetteAnalyzer();
+      showRecognitionPanel();
+    }
+  }
+}
+
+/**
+ * Atualiza UI do modo Calibrar Armadura
+ */
+function updateCalibrationModeUI(enabled) {
+  const calibBtn = document.getElementById('btn-calibrate-armor');
+  const prepareBtn = document.getElementById('btn-prepare-character');
+  const exitBtn = document.getElementById('btn-exit-rigging');
+  const cutBtn = document.getElementById('btn-cut-piece');
+  const pieceMapBtn = document.getElementById('btn-piece-map');
+  const editPartsBtn = document.getElementById('btn-edit-parts');
+  const calibrationToolbar = document.getElementById('calibration-toolbar');
+  const pieceMapToolbar = document.getElementById('piece-map-toolbar');
+  const editPartsToolbar = document.getElementById('edit-parts-toolbar');
+  const testMovementControls = document.getElementById('test-movement-controls');
+  const propsTitle = document.querySelector('.panel-right .panel-header h2');
+  const appContainer = document.querySelector('.app-container');
+  
+  if (enabled) {
+    if (calibBtn) calibBtn.style.display = 'inline-flex';
+    if (prepareBtn) prepareBtn.style.display = 'none';
+    if (exitBtn) exitBtn.style.display = 'none';
+    if (cutBtn) cutBtn.style.display = 'none';
+    if (pieceMapBtn) pieceMapBtn.style.display = 'none';
+    if (editPartsBtn) editPartsBtn.style.display = 'none';
+    if (calibrationToolbar) calibrationToolbar.classList.remove('hidden');
+    if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+    if (editPartsToolbar) editPartsToolbar.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
+    
+    // Add calibration mode active class for CSS panel management
+    if (appContainer) appContainer.classList.add('calibration-mode-active');
+    
+    // Reset tool buttons
+    const jointsBtn = document.getElementById('calib-tool-joints');
+    const regionsBtn = document.getElementById('calib-tool-regions');
+    const coverageBtn = document.getElementById('calib-tool-coverage');
+    const recognizeBtn = document.getElementById('calib-tool-recognize');
+    if (jointsBtn) jointsBtn.classList.add('active');
+    if (regionsBtn) regionsBtn.classList.remove('active');
+    if (coverageBtn) coverageBtn.classList.remove('active');
+    if (recognizeBtn) recognizeBtn.classList.remove('active');
+    
+    if (propsTitle) propsTitle.textContent = 'CALIBRAR ARMADURA';
+  } else {
+    if (calibBtn) calibBtn.style.display = 'none';
+    if (prepareBtn) prepareBtn.style.display = 'inline-flex';
+    if (exitBtn) exitBtn.style.display = 'inline-flex';
+    if (cutBtn) cutBtn.style.display = 'none';
+    if (pieceMapBtn) pieceMapBtn.style.display = 'inline-flex';
+    if (editPartsBtn) editPartsBtn.style.display = 'inline-flex';
+    if (calibrationToolbar) calibrationToolbar.classList.add('hidden');
+    if (pieceMapToolbar) pieceMapToolbar.classList.add('hidden');
+    if (editPartsToolbar) editPartsToolbar.classList.add('hidden');
+    if (testMovementControls) testMovementControls.classList.add('hidden');
+    
+    // Remove calibration mode active class
+    if (appContainer) appContainer.classList.remove('calibration-mode-active');
+    
+    if (propsTitle) propsTitle.textContent = 'ARMADURA';
+  }
+}
+
+/**
+ * Mostra painel de calibração
+ */
+function showCalibrationPanel() {
+  const calibrationPanel = document.getElementById('calibration-panel');
+  if (calibrationPanel) calibrationPanel.classList.remove('hidden');
+}
+
+/**
+ * Callback de seleção de região no modo Calibrar Armadura
+ */
+function onCalibrationRegionSelectionChange(region) {
+  if (region) {
+    updateStatus(`Região selecionada: ${region.name}`);
+    app.calibrationSelectedRegionId = region.id;
+  } else {
+    updateStatus('Nenhuma região selecionada');
+    app.calibrationSelectedRegionId = null;
+  }
+  
+  // Atualiza painel lateral com info da região
+  updateCalibrationPanel();
+}
+
+/**
+ * Callback de mudança de região (pontos movidos) no modo Calibrar Armadura
+ */
+function onCalibrationRegionChange(region) {
+  console.log('Região modificada na calibração:', region.name);
+  updateCalibrationPanel();
+}
+
+/**
+ * Callback de seleção de bone no modo Calibrar Armadura
+ */
+function onCalibrationBoneSelectionChange(bone) {
+  if (bone) {
+    updateStatus(`Articulação selecionada: ${bone.name}`);
+    // Atualiza painel de propriedades do bone (reutiliza rigging panel)
+    if (app.rigEditor && app.rigEditor._updatePropertiesPanel) {
+      app.rigEditor._updatePropertiesPanel();
+    }
+  } else {
+    updateStatus('Nenhuma articulação selecionada');
+  }
+}
+
+/**
+ * Atualiza painel lateral no modo Calibrar Armadura
+ */
+function updateCalibrationPanel() {
+  if (!app.pieceMap) return;
+  
+  const calibrationPanel = document.getElementById('calibration-panel');
+  if (!calibrationPanel) return;
+  
+  if (app.calibrationTool === 'joints') {
+    // Mostra painel de propriedades do bone (reutiliza rigging panel)
+    const riggingPanel = document.getElementById('rigging-panel');
+    if (riggingPanel) {
+      // Copia o conteúdo do rigging panel para o calibration panel
+      calibrationPanel.innerHTML = riggingPanel.innerHTML;
+      calibrationPanel.classList.remove('hidden');
+      riggingPanel.classList.add('hidden');
+    }
+    return;
+  }
+  
+  // Ferramenta Regiões - painel personalizado
+  const region = app.calibrationSelectedRegionId ? app.pieceMap.getRegion(app.calibrationSelectedRegionId) : null;
+  
+  if (!region) {
+    calibrationPanel.innerHTML = `
+      <div style="padding: 16px; color: #888; text-align: center;">
+        <p>Selecione uma região no canvas para ajustar.</p>
+        <p style="font-size: 12px; margin-top: 8px;">Use a ferramenta <strong>Regiões</strong> e clique numa região colorida.</p>
+      </div>
+    `;
+    calibrationPanel.classList.remove('hidden');
+    return;
+  }
+  
+  // Calcula bounding box da região para largura/altura
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const pt of region.points) {
+    minX = Math.min(minX, pt.x);
+    minY = Math.min(minY, pt.y);
+    maxX = Math.max(maxX, pt.x);
+    maxY = Math.max(maxY, pt.y);
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  
+  calibrationPanel.innerHTML = `
+    <div style="padding: 16px; font-family: Segoe UI, sans-serif;">
+      <h3 style="margin: 0 0 16px; color: #fff; font-size: 14px;">${region.name}</h3>
+      <div style="color: #888; font-size: 12px; margin-bottom: 16px;">Osso associado: ${region.boneId}</div>
+      
+      <div class="form-group">
+        <label>Largura</label>
+        <div class="form-row" style="align-items: center; gap: 8px;">
+          <input type="number" id="calib-region-width" step="0.1" value="${width.toFixed(1)}" style="width: 80px;">
+          <input type="range" id="calib-region-width-slider" min="10" max="200" value="${width}" step="1" style="flex: 1;">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Altura</label>
+        <div class="form-row" style="align-items: center; gap: 8px;">
+          <input type="number" id="calib-region-height" step="0.1" value="${height.toFixed(1)}" style="width: 80px;">
+          <input type="range" id="calib-region-height-slider" min="10" max="300" value="${height}" step="1" style="flex: 1;">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Posição X (centro)</label>
+        <input type="number" id="calib-region-center-x" step="0.1" value="${centerX.toFixed(1)}">
+      </div>
+      
+      <div class="form-group">
+        <label>Posição Y (centro)</label>
+        <input type="number" id="calib-region-center-y" step="0.1" value="${centerY.toFixed(1)}">
+      </div>
+      
+      <div class="form-group">
+        <label>Rotação (graus)</label>
+        <div class="form-row" style="align-items: center; gap: 8px;">
+          <input type="number" id="calib-region-rotation" step="1" min="-180" max="180" value="0" style="width: 80px;">
+          <input type="range" id="calib-region-rotation-slider" min="-180" max="180" value="0" step="1" style="flex: 1;">
+        </div>
+      </div>
+      
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #333;">
+        <p style="color: #888; font-size: 12px; margin: 0 0 12px;">${region.points.length} vértices editáveis</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="btn-reset-region" class="btn btn-secondary" style="flex: 1; min-width: 120px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+            Repor Região
+          </button>
+          <button id="btn-confirm-region" class="btn btn-primary" style="flex: 1; min-width: 120px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Confirmar Ajustes
+          </button>
+        </div>
+      </div>
+    `;
+    
+    calibrationPanel.classList.remove('hidden');
+    
+    // Event listeners para os controles
+    const widthInput = document.getElementById('calib-region-width');
+    const widthSlider = document.getElementById('calib-region-width-slider');
+    const heightInput = document.getElementById('calib-region-height');
+    const heightSlider = document.getElementById('calib-region-height-slider');
+    const centerXInput = document.getElementById('calib-region-center-x');
+    const centerYInput = document.getElementById('calib-region-center-y');
+    const rotationInput = document.getElementById('calib-region-rotation');
+    const rotationSlider = document.getElementById('calib-region-rotation-slider');
+    const btnReset = document.getElementById('btn-reset-region');
+    const btnConfirm = document.getElementById('btn-confirm-region');
+    
+    const updateRegionGeometry = () => {
+      const newWidth = parseFloat(widthInput.value) || width;
+      const newHeight = parseFloat(heightInput.value) || height;
+      const newCenterX = parseFloat(centerXInput.value) || centerX;
+      const newCenterY = parseFloat(centerYInput.value) || centerY;
+      const newRotation = parseFloat(rotationInput.value) || 0;
+      
+      // Recalcula pontos mantendo forma relativa
+      const halfW = newWidth / 2;
+      const halfH = newHeight / 2;
+      const cosR = Math.cos(newRotation * Math.PI / 180);
+      const sinR = Math.sin(newRotation * Math.PI / 180);
+      
+      // Define novos pontos como retângulo rotacionado (base) ou mantém forma original escalada
+      const originalPoints = region.originalPoints || region.points;
+      const origCenterX = originalPoints.reduce((sum, p) => sum + p.x, 0) / originalPoints.length;
+      const origCenterY = originalPoints.reduce((sum, p) => sum + p.y, 0) / originalPoints.length;
+      const origWidth = Math.max(...originalPoints.map(p => p.x)) - Math.min(...originalPoints.map(p => p.x));
+      const origHeight = Math.max(...originalPoints.map(p => p.y)) - Math.min(...originalPoints.map(p => p.y));
+      
+      const scaleX = origWidth > 0 ? newWidth / origWidth : 1;
+      const scaleY = origHeight > 0 ? newHeight / origHeight : 1;
+      
+      const newPoints = originalPoints.map(p => {
+        // Translada para origem, escala, rotaciona, translada para nova posição
+        let dx = p.x - origCenterX;
+        let dy = p.y - origCenterY;
+        
+        // Escala
+        dx *= scaleX;
+        dy *= scaleY;
+        
+        // Rotaciona
+        const rx = dx * cosR - dy * sinR;
+        const ry = dx * sinR + dy * cosR;
+        
+        return { x: newCenterX + rx, y: newCenterY + ry };
+      });
+      
+      region.points = newPoints;
+      
+      if (app.pieceMap.onRegionChange) {
+        app.pieceMap.onRegionChange(region);
+      }
+      app.renderer.render(app.scene);
+    };
+    
+    // Sincroniza inputs e sliders
+    const syncWidth = (val) => {
+      widthInput.value = val;
+      widthSlider.value = val;
+      updateRegionGeometry();
+    };
+    const syncHeight = (val) => {
+      heightInput.value = val;
+      heightSlider.value = val;
+      updateRegionGeometry();
+    };
+    const syncRotation = (val) => {
+      rotationInput.value = val;
+      rotationSlider.value = val;
+      updateRegionGeometry();
+    };
+    
+    widthInput.addEventListener('change', () => syncWidth(widthInput.value));
+    widthSlider.addEventListener('input', () => syncWidth(widthSlider.value));
+    heightInput.addEventListener('change', () => syncHeight(heightInput.value));
+    heightSlider.addEventListener('input', () => syncHeight(heightSlider.value));
+    centerXInput.addEventListener('change', updateRegionGeometry);
+    centerYInput.addEventListener('change', updateRegionGeometry);
+    rotationInput.addEventListener('change', () => syncRotation(rotationInput.value));
+    rotationSlider.addEventListener('input', () => syncRotation(rotationSlider.value));
+    
+    btnReset.addEventListener('click', () => {
+      // Restaura pontos originais
+      if (region.originalPoints) {
+        region.points = region.originalPoints.map(p => ({ x: p.x, y: p.y }));
+      } else {
+        // Regenera região baseada no osso
+        const bone = app.rig.getBone(region.boneId);
+        if (bone && bone.worldTransform) {
+          // Força regeneração
+          const charInv = app.currentCharacterObject.transform.getInverse();
+          // Usar generateRegions não é ideal aqui, apenas resetamos os pontos
+        }
+      }
+      if (app.pieceMap.onRegionChange) {
+        app.pieceMap.onRegionChange(region);
+      }
+      updateCalibrationPanel();
+      app.renderer.render(app.scene);
+    });
+    
+    btnConfirm.addEventListener('click', () => {
+      // Confirma ajustes - salva originalPoints como pontos atuais
+      region.originalPoints = region.points.map(p => ({ x: p.x, y: p.y }));
+      updateStatus(`Região "${region.name}" confirmada`);
+      updateCalibrationPanel();
+    });
+}
+
+/**
  * Callback de seleção de região no Mapa de Peças
  */
 function onPieceMapSelectionChange(region) {
@@ -1568,6 +2224,7 @@ function updatePieceMapPanel(selectedRegion) {
       selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
+}
 
 /**
  * Alterna modo Editar Peças
@@ -2457,11 +3114,516 @@ function updateCanvasInfo(screenX, screenY) {
   }
 }
 
+/**
+ * Inicializa o analisador de silhueta para o personagem atual
+ */
+async function initializeSilhouetteAnalyzer() {
+  if (!app.currentCharacterObject || !app.currentCharacterObject.imageElement) return;
+  
+  if (!app.silhouetteAnalyzer) {
+    try {
+      app.silhouetteAnalyzer = await createSilhouetteAnalyzer(app.currentCharacterObject, {
+        alphaThreshold: 128,
+        downsample: 1 // Usar resolução original para precisão
+      });
+      updateStatus('Silhueta analisada');
+    } catch (err) {
+      console.error('Erro ao analisar silhueta:', err);
+      updateStatus(`Erro na análise de silhueta: ${err.message}`);
+    }
+  }
+  
+  // Atualiza visualização de cobertura
+  updateCoverageVisualization();
+}
+
+/**
+ * Atualiza a visualização de cobertura anatómica
+ */
+function updateCoverageVisualization() {
+  if (!app.isCalibrationMode || app.calibrationTool !== 'coverage') return;
+  if (!app.silhouetteAnalyzer || !app.pieceMap || !app.currentCharacterObject) return;
+  
+  const alphaThresholdEl = document.getElementById('coverage-alpha-threshold');
+  const alphaValueEl = document.getElementById('coverage-alpha-value');
+  const coverageBadgeEl = document.getElementById('coverage-badge');
+  const statCoveredEl = document.getElementById('stat-covered');
+  const statCoveredPxEl = document.getElementById('stat-covered-px');
+  const statUncoveredEl = document.getElementById('stat-uncovered');
+  const statOverlappingEl = document.getElementById('stat-overlapping');
+  const statOutsideEl = document.getElementById('stat-outside');
+  const statTotalEl = document.getElementById('stat-total');
+  
+  const alphaThreshold = alphaThresholdEl ? parseInt(alphaThresholdEl.value, 10) : 128;
+  if (alphaValueEl) alphaValueEl.textContent = alphaThreshold;
+  
+  // Atualiza limiar no analisador
+  app.silhouetteAnalyzer.alphaThreshold = alphaThreshold;
+  app.silhouetteAnalyzer._silhouetteMask = null; // Força recálculo
+  app.silhouetteAnalyzer._silhouettePixelCount = null;
+  app.silhouetteAnalyzer._contours = null;
+  app.silhouetteAnalyzer._coverageStats = null;
+  
+  // Opções de visualização
+  const showUncovered = document.getElementById('coverage-show-uncovered')?.checked ?? true;
+  const showOverlapping = document.getElementById('coverage-show-overlapping')?.checked ?? true;
+  const showOutside = document.getElementById('coverage-show-outside')?.checked ?? true;
+  const showRegions = document.getElementById('coverage-show-regions')?.checked ?? true;
+  
+  try {
+    const result = app.silhouetteAnalyzer.generateCoverageVisualization(
+      app.pieceMap,
+      app.currentCharacterObject,
+      app.renderer,
+      {
+        showSilhouette: true,
+        showRegions,
+        showUncovered,
+        showOverlapping,
+        showOutside
+      }
+    );
+    
+    app.coverageVisualizationCanvas = result.canvas;
+    
+    // Atualiza estatísticas nos novos elementos
+    const stats = result.stats;
+    if (coverageBadgeEl) {
+      coverageBadgeEl.textContent = `${stats.coverage.toFixed(1)}%`;
+    }
+    if (statCoveredEl) {
+      statCoveredEl.textContent = `${stats.coverage.toFixed(1)}%`;
+    }
+    if (statCoveredPxEl) {
+      statCoveredPxEl.textContent = stats.coveredPixels.toLocaleString();
+    }
+    if (statUncoveredEl) {
+      statUncoveredEl.textContent = stats.uncoveredPixels.toLocaleString();
+    }
+    if (statOverlappingEl) {
+      statOverlappingEl.textContent = stats.overlappingPixels.toLocaleString();
+    }
+    if (statOutsideEl) {
+      statOutsideEl.textContent = stats.outsidePixels.toLocaleString();
+    }
+    if (statTotalEl) {
+      statTotalEl.textContent = stats.totalSilhouettePixels.toLocaleString();
+    }
+    
+    app.renderer.render(app.scene);
+  } catch (err) {
+    console.error('Erro ao gerar visualização de cobertura:', err);
+    const badgeEl = document.getElementById('coverage-badge');
+    if (badgeEl) badgeEl.textContent = 'Erro';
+  }
+}
+
+/**
+ * Handler para mudança do limiar alfa
+ */
+function onCoverageAlphaThresholdChange() {
+  const alphaValueEl = document.getElementById('coverage-alpha-value');
+  const slider = document.getElementById('coverage-alpha-threshold');
+  if (alphaValueEl && slider) {
+    alphaValueEl.textContent = slider.value;
+  }
+  // Debounce a atualização
+  clearTimeout(app._coverageUpdateTimeout);
+  app._coverageUpdateTimeout = setTimeout(updateCoverageVisualization, 150);
+}
+
+/**
+ * Desenha a visualização de cobertura no canvas principal
+ */
+function drawCoverageVisualization() {
+  if (!app.coverageVisualizationCanvas || !app.currentCharacterObject) return;
+  
+  const ctx = app.renderer.ctx;
+  const canvas = app.coverageVisualizationCanvas;
+  
+  // Transforma para espaço do personagem
+  ctx.save();
+  
+  const charMatrix = app.currentCharacterObject.transform.m;
+  const viewportMatrix = app.renderer.viewport.m;
+  
+  const combined = new Transform2D();
+  combined.setMatrix(
+    viewportMatrix[0] * charMatrix[0] + viewportMatrix[2] * charMatrix[1],
+    viewportMatrix[1] * charMatrix[0] + viewportMatrix[3] * charMatrix[1],
+    viewportMatrix[0] * charMatrix[2] + viewportMatrix[2] * charMatrix[3],
+    viewportMatrix[1] * charMatrix[2] + viewportMatrix[3] * charMatrix[3],
+    viewportMatrix[0] * charMatrix[4] + viewportMatrix[2] * charMatrix[5] + viewportMatrix[4],
+    viewportMatrix[1] * charMatrix[4] + viewportMatrix[3] * charMatrix[5] + viewportMatrix[5]
+  );
+  
+  ctx.transform(
+    combined.m[0], combined.m[1],
+    combined.m[2], combined.m[3],
+    combined.m[4], combined.m[5]
+  );
+  
+  // Escala para compensar downsample do analisador
+  const scaleX = app.currentCharacterObject.imageWidth / canvas.width;
+  const scaleY = app.currentCharacterObject.imageHeight / canvas.height;
+  ctx.scale(scaleX, scaleY);
+  
+  // Desenha a visualização centrada na origem do personagem
+  ctx.drawImage(
+    canvas,
+    -app.currentCharacterObject.imageWidth / 2,
+    -app.currentCharacterObject.imageHeight / 2,
+    app.currentCharacterObject.imageWidth,
+    app.currentCharacterObject.imageHeight
+  );
+  
+  ctx.restore();
+}
+
+/**
+ * Mostra painel de reconhecimento
+ */
+function showRecognitionPanel() {
+  const recognitionPanel = document.getElementById('recognition-panel');
+  if (recognitionPanel) recognitionPanel.classList.remove('hidden');
+  
+  // Reset UI state
+  const readyEl = document.getElementById('recognition-ready');
+  const progressEl = document.getElementById('recognition-progress');
+  const resultsEl = document.getElementById('recognition-results');
+  const errorEl = document.getElementById('recognition-error');
+  const badgeEl = document.getElementById('recognition-status-badge');
+  
+  if (readyEl) readyEl.classList.remove('hidden');
+  if (progressEl) progressEl.classList.add('hidden');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  if (errorEl) errorEl.classList.add('hidden');
+  if (badgeEl) {
+    badgeEl.textContent = 'Pronto';
+    badgeEl.style.background = '#666';
+  }
+}
+
+/**
+ * Inicia reconhecimento anatómico automático
+ */
+async function startRecognition() {
+  if (app.isRecognizing) return;
+  if (!app.currentCharacterObject || !app.silhouetteAnalyzer || !app.pieceMap) return;
+  
+  app.isRecognizing = true;
+  app.previousPieceMapState = null; // Será salvo antes de aplicar
+  
+  const readyEl = document.getElementById('recognition-ready');
+  const progressEl = document.getElementById('recognition-progress');
+  const resultsEl = document.getElementById('recognition-results');
+  const errorEl = document.getElementById('recognition-error');
+  const badgeEl = document.getElementById('recognition-status-badge');
+  const progressBarEl = document.getElementById('recognition-progress-bar');
+  const progressTextEl = document.getElementById('recognition-progress-text');
+  const progressMessageEl = document.getElementById('recognition-progress-message');
+  
+  if (readyEl) readyEl.classList.add('hidden');
+  if (progressEl) progressEl.classList.remove('hidden');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  if (errorEl) errorEl.classList.add('hidden');
+  if (badgeEl) {
+    badgeEl.textContent = 'A processar...';
+    badgeEl.style.background = '#007acc';
+  }
+  
+  try {
+    // Cria reconhecedor se não existir
+    if (!app.anatomicalRecognizer) {
+      app.anatomicalRecognizer = await createAnatomicalRecognizer(
+        app.currentCharacterObject,
+        app.silhouetteAnalyzer,
+        app.currentCharacterObject.rig,
+        app.renderer
+      );
+    }
+    
+    // Executa reconhecimento
+    const result = await app.anatomicalRecognizer.recognize({
+      onProgress: (percent, message) => {
+        if (progressBarEl) progressBarEl.style.width = `${percent}%`;
+        if (progressTextEl) progressTextEl.textContent = `${Math.round(percent)}%`;
+        if (progressMessageEl) progressMessageEl.textContent = message;
+      }
+    });
+    
+    app.recognitionResult = result;
+    
+    // Gera visualização
+    app.recognitionVisualizationCanvas = result.masks ? 
+      app.anatomicalRecognizer.generateVisualization().canvas : null;
+    
+    // Atualiza UI com resultados
+    if (progressEl) progressEl.classList.add('hidden');
+    if (resultsEl) resultsEl.classList.remove('hidden');
+    if (badgeEl) {
+      badgeEl.textContent = 'Concluído';
+      badgeEl.style.background = '#28a745';
+    }
+    
+    // Mostra resumo de qualidade
+    const qualityEl = document.getElementById('recognition-quality-summary');
+    if (qualityEl && result.quality) {
+      const q = result.quality;
+      qualityEl.innerHTML = `
+        Cobertura: <strong>${q.coverage.toFixed(1)}%</strong> | 
+        Píxeis da silhueta: ${q.totalSilhouettePixels} | 
+        Cobertos: ${q.coveredPixels} | 
+        Não cobertos: <span style="color: #ff6666;">${q.uncoveredPixels}</span> | 
+        Sobreposição: <span style="color: #ff66ff;">${q.overlappingPixels}</span> | 
+        Fora: <span style="color: #ffff66;">${q.outsidePixels}</span>
+        <br>Regiões detectadas: ${Object.keys(q.regions).length}
+      `;
+    }
+    
+    // Renderiza visualização
+    app.renderer.render(app.scene);
+    
+  } catch (err) {
+    console.error('Erro no reconhecimento:', err);
+    const readyEl = document.getElementById('recognition-ready');
+    if (progressEl) progressEl.classList.add('hidden');
+    if (readyEl) readyEl.classList.remove('hidden');
+    if (errorEl) {
+      errorEl.textContent = `Erro: ${err.message}`;
+      errorEl.classList.remove('hidden');
+    }
+    if (badgeEl) {
+      badgeEl.textContent = 'Erro';
+      badgeEl.style.background = '#dc3545';
+    }
+  } finally {
+    app.isRecognizing = false;
+  }
+}
+
+/**
+ * Cancela reconhecimento em andamento
+ */
+function cancelRecognition() {
+  if (app.anatomicalRecognizer) {
+    app.anatomicalRecognizer.cancel();
+  }
+  app.isRecognizing = false;
+  
+  const readyEl = document.getElementById('recognition-ready');
+  const progressEl = document.getElementById('recognition-progress');
+  const badgeEl = document.getElementById('recognition-status-badge');
+  
+  if (readyEl) readyEl.classList.remove('hidden');
+  if (progressEl) progressEl.classList.add('hidden');
+  if (badgeEl) {
+    badgeEl.textContent = 'Cancelado';
+    badgeEl.style.background = '#666';
+  }
+  
+  updateStatus('Reconhecimento cancelado');
+}
+
+/**
+ * Aplica o reconhecimento ao PieceMap
+ */
+function applyRecognition() {
+  if (!app.recognitionResult || !app.anatomicalRecognizer || !app.pieceMap) return;
+  
+  // Salva estado anterior do PieceMap para permitir reverter
+  app.previousPieceMapState = JSON.parse(JSON.stringify(app.pieceMap.toJSON()));
+  
+  // Converte máscaras anatómicas para regiões do PieceMap
+  const masks = app.anatomicalRecognizer.anatomicalMasks;
+  const silW = app.silhouetteAnalyzer._alphaWidth;
+  const silH = app.silhouetteAnalyzer._alphaHeight;
+  
+  // Para cada máscara, converte para pontos poligonais e atualiza PieceMap
+  // Isso é uma simplificação - na prática, faríamos vectorização das máscaras
+  const regions = app.pieceMap.getAllRegions();
+  
+  for (const region of regions) {
+    const mask = masks.get(region.id);
+    if (mask) {
+      // Converte máscara para pontos (simplificado: usa bounding box da máscara)
+      const points = maskToPolygonPoints(mask, silW, silH);
+      if (points && points.length >= 3) {
+        // Transforma pontos de volta para espaço local do personagem
+        const localPoints = points.map(p => {
+          return app.silhouetteAnalyzer.screenToCharacterLocal(
+            p.x * (app.currentCharacterObject.imageWidth / silW),
+            p.y * (app.currentCharacterObject.imageHeight / silH)
+          );
+        });
+        
+        region.points = localPoints;
+        region.originalPoints = localPoints.map(p => ({ x: p.x, y: p.y }));
+      }
+    }
+  }
+  
+  // Notifica mudança
+  if (app.pieceMap.onRegionChange) {
+    for (const region of regions) {
+      app.pieceMap.onRegionChange(region);
+    }
+  }
+  
+  // Atualiza UI
+  updateCalibrationPanel();
+  app.renderer.render(app.scene);
+  
+  // Esconde painel de resultados
+  const resultsEl = document.getElementById('recognition-results');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  
+  const badgeEl = document.getElementById('recognition-status-badge');
+  if (badgeEl) {
+    badgeEl.textContent = 'Aplicado';
+    badgeEl.style.background = '#28a745';
+  }
+  
+  updateStatus('Reconhecimento anatómico aplicado às regiões');
+}
+
+/**
+ * Converte máscara binária para pontos poligonais (aproximação simples)
+ */
+function maskToPolygonPoints(mask, width, height) {
+  const points = [];
+  const step = Math.max(1, Math.floor(Math.sqrt(width * height) / 50)); // Amostra ~50 pontos
+  
+  // Encontra contorno usando marching squares simplificado
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const idx = y * width + x;
+      if (mask[idx]) {
+        // Verifica se é borda (tem vizinho transparente)
+        let isEdge = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx * step;
+            const ny = y + dy * step;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height || !mask[ny * width + nx]) {
+              isEdge = true;
+              break;
+            }
+          }
+          if (isEdge) break;
+        }
+        if (isEdge) {
+          points.push({ x, y });
+        }
+      }
+    }
+  }
+  
+  // Ordena pontos angularmente em torno do centro
+  if (points.length < 3) return null;
+  
+  const cx = points.reduce((a, p) => a + p.x, 0) / points.length;
+  const cy = points.reduce((a, p) => a + p.y, 0) / points.length;
+  
+  points.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  
+  // Simplifica (remove pontos muito próximos)
+  const simplified = [];
+  const minDist = 2;
+  for (const p of points) {
+    if (simplified.length === 0 || 
+        Math.hypot(p.x - simplified[simplified.length - 1].x, p.y - simplified[simplified.length - 1].y) > minDist) {
+      simplified.push(p);
+    }
+  }
+  
+  return simplified.length >= 3 ? simplified : null;
+}
+
+/**
+ * Cancela resultado do reconhecimento (reverte para estado anterior)
+ */
+function cancelRecognitionResult() {
+  // Restaura PieceMap anterior se existir
+  if (app.previousPieceMapState && app.currentCharacterObject) {
+    app.currentCharacterObject.pieceMap = PieceMap.fromJSON(
+      app.previousPieceMapState,
+      app.currentCharacterObject,
+      app.currentCharacterObject.rig,
+      app.renderer
+    );
+    app.pieceMap = app.currentCharacterObject.pieceMap;
+    app.pieceMap.onSelectionChange = onCalibrationRegionSelectionChange;
+    app.pieceMap.onRegionChange = onCalibrationRegionChange;
+    updateCalibrationPanel();
+    app.renderer.render(app.scene);
+  }
+  
+  const resultsEl = document.getElementById('recognition-results');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  
+  const badgeEl = document.getElementById('recognition-status-badge');
+  if (badgeEl) {
+    badgeEl.textContent = 'Revertido';
+    badgeEl.style.background = '#666';
+  }
+  
+  app.recognitionResult = null;
+  app.recognitionVisualizationCanvas = null;
+  app.previousPieceMapState = null;
+  
+  updateStatus('Reconhecimento revertido');
+}
+
+/**
+ * Desenha a visualização de reconhecimento no canvas principal
+ */
+function drawRecognitionVisualization() {
+  if (!app.recognitionVisualizationCanvas || !app.currentCharacterObject) return;
+  
+  const ctx = app.renderer.ctx;
+  const canvas = app.recognitionVisualizationCanvas;
+  
+  ctx.save();
+  
+  const charMatrix = app.currentCharacterObject.transform.m;
+  const viewportMatrix = app.renderer.viewport.m;
+  
+  const combined = new Transform2D();
+  combined.setMatrix(
+    viewportMatrix[0] * charMatrix[0] + viewportMatrix[2] * charMatrix[1],
+    viewportMatrix[1] * charMatrix[0] + viewportMatrix[3] * charMatrix[1],
+    viewportMatrix[0] * charMatrix[2] + viewportMatrix[2] * charMatrix[3],
+    viewportMatrix[1] * charMatrix[2] + viewportMatrix[3] * charMatrix[3],
+    viewportMatrix[0] * charMatrix[4] + viewportMatrix[2] * charMatrix[5] + viewportMatrix[4],
+    viewportMatrix[1] * charMatrix[4] + viewportMatrix[3] * charMatrix[5] + viewportMatrix[5]
+  );
+  
+  ctx.transform(
+    combined.m[0], combined.m[1],
+    combined.m[2], combined.m[3],
+    combined.m[4], combined.m[5]
+  );
+  
+  const scaleX = app.currentCharacterObject.imageWidth / canvas.width;
+  const scaleY = app.currentCharacterObject.imageHeight / canvas.height;
+  ctx.scale(scaleX, scaleY);
+  
+  ctx.drawImage(
+    canvas,
+    -app.currentCharacterObject.imageWidth / 2,
+    -app.currentCharacterObject.imageHeight / 2,
+    app.currentCharacterObject.imageWidth,
+    app.currentCharacterObject.imageHeight
+  );
+  
+  ctx.restore();
+}
+
 // Inicializa quando DOM estiver pronto
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
-}
-
 }

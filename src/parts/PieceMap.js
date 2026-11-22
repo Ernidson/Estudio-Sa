@@ -826,6 +826,7 @@ export class PieceMap {
       regionsData[id] = {
         boneId: region.boneId,
         points: region.points,
+        originalPoints: region.originalPoints || region.points,
         color: region.color,
         name: region.name,
         visible: region.visible,
@@ -849,7 +850,7 @@ export class PieceMap {
           id,
           boneId: regionData.boneId,
           points: regionData.points.map(p => ({ x: p.x, y: p.y })),
-          originalPoints: regionData.points.map(p => ({ x: p.x, y: p.y })),
+          originalPoints: (regionData.originalPoints || regionData.points).map(p => ({ x: p.x, y: p.y })),
           color: regionData.color,
           name: regionData.name,
           selected: false,
