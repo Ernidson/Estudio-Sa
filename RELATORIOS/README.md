@@ -9,6 +9,8 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-22 | Bacia e tornozelos | 72/72 pontos interpretáveis após revisão no treinador | Testado | [Relatório](2026-11-22_bacia_tornozelos_bodypix.md) | PR #1 |
+| 2026-11-22 | Recuperação do fluxo raster | BodyPix local, calibração, recorte e reabertura | Testado | [Relatório](2026-11-22_recuperacao_fluxo_raster.md) | 06f0868 |
 | 2026-11-22 | Correção Distribuição Anatómica 2D.3 | Polígonos (tronco), eliminação sobreposições, transformações corretas | 🧪 Em teste | [2026-11-22_correcao_distribuicao_anatomica.md](./2026-11-22_correcao_distribuicao_anatomica.md) | — |
 | 2026-11-22 | Correção Leitura Real da Máscara | Correção de 3 erros: person.mask vs segmentation, toImageData() assíncrono, leitura canal alfa RGBA | 🧪 Em teste | [2026-11-22_correcao_leitura_mascara.md](./2026-11-22_correcao_leitura_mascara.md) | — |
 | 2026-11-22 | Correção API Segmentação — segmentPeople() | estimatePeopleSegments() → segmentPeople() no MediaPipeSelfieSegmentation | 🧪 Em teste | [2026-11-22_correcao_api_segmentacao.md](./2026-11-22_correcao_api_segmentacao.md) | — |

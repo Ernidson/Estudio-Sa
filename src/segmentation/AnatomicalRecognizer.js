@@ -26,6 +26,33 @@ const LEGACY_REGIONS = {
   l_ankle: 'pe_esquerdo', r_ankle: 'pe_direito',
 };
 
+// Learn clothing colours from this prediction. Only use them where the rig
+// already places two neighbouring anatomical classes close to their boundary.
+function clothingMeans(labels, rgba) {
+  const sums = new Map();
+  for (let i = 0; i < labels.length; i++) {
+    const key = PART_REGION[labels[i] - 1]?.replace(/^[lr]_/, '');
+    if (!key || !['chest', 'hip', 'knee', 'ankle'].includes(key)) continue;
+    if (!sums.has(key)) sums.set(key, [0, 0, 0, 0]);
+    const sum = sums.get(key);
+    for (let c = 0; c < 3; c++) sum[c] += rgba[4*i+c];
+    sum[3]++;
+  }
+  return new Map([...sums].map(([key, sum]) => [key, sum.slice(0, 3).map(v => v / sum[3])]));
+}
+
+function matchesNeighbour(rgba, i, means, from, to) {
+  const a = means.get(from), b = means.get(to);
+  if (!a || !b) return false;
+  let separation = 0, current = 0, neighbour = 0;
+  for (let c = 0; c < 3; c++) {
+    separation += (a[c] - b[c]) ** 2;
+    current += (rgba[4*i+c] - a[c]) ** 2;
+    neighbour += (rgba[4*i+c] - b[c]) ** 2;
+  }
+  return separation > 3600 && neighbour < separation * 0.25 && neighbour < current * 0.2;
+}
+
 export class AnatomicalRecognizer {
   constructor(imageElement, silhouetteAnalyzer, rig, characterObject, renderer) {
     this.imageElement = imageElement;
@@ -289,6 +316,7 @@ export class AnatomicalRecognizer {
       dx: ((hips[0][2] - hips[0][0]) + (hips[1][2] - hips[1][0])) / 2,
       dy: ((hips[0][3] - hips[0][1]) + (hips[1][3] - hips[1][1])) / 2,
     } : null;
+    const means = clothingMeans(labels, rgba);
     for (let i = 0; i < labels.length; i++) {
       if (!labels[i]) continue;
       let key = PART_REGION[labels[i] - 1];
@@ -298,14 +326,26 @@ export class AnatomicalRecognizer {
         if (a && b) {
           const x = i % w, y = Math.floor(i / w);
           const dist = p => this._pointToSegmentDistSq(x, y, ...p);
-          const margin = ((a[0]-b[0])**2 + (a[1]-b[1])**2) * 0.15;
+          const ambiguity = /_(knee|ankle)$/.test(key) ? 0.025 : 0.15;
+          const margin = ((a[0]-b[0])**2 + (a[1]-b[1])**2) * ambiguity;
           if (dist(b) + margin < dist(a)) key = other;
         }
       }
-      if (hipLine && (key === 'l_hip' || key === 'r_hip')) {
+      if (hipLine && (key === 'l_hip' || key === 'r_hip' || key === 'chest')) {
         const {x, y, dx, dy} = hipLine;
         const along = ((i % w - x)*dx + (Math.floor(i / w) - y)*dy) / (dx*dx + dy*dy || 1);
-        if (along < 0.36 && along > -0.5) key = 'pelvis';
+        if (along < 0.36 && along > -0.5 &&
+            (key !== 'chest' || matchesNeighbour(rgba, i, means, 'chest', 'hip'))) key = 'pelvis';
+      }
+      if (/_(knee|ankle)$/.test(key)) {
+        const side = key.slice(0, 2);
+        const ankle = centers[side + 'ankle'], shin = centers[side + 'knee'];
+        if (ankle && shin) {
+          const length = Math.hypot(shin[2]-shin[0], shin[3]-shin[1]);
+          const distance = Math.hypot(i % w - ankle[0], Math.floor(i / w) - ankle[1]);
+          const from = key.slice(2), to = from === 'ankle' ? 'knee' : 'ankle';
+          if (distance < length * 0.55 && matchesNeighbour(rgba, i, means, from, to)) key = side + to;
+        }
       }
       const id = this.rig.getBone(key) ? key : LEGACY_REGIONS[key];
       if (!masks.has(id)) masks.set(id, new Uint8Array(w*h));
