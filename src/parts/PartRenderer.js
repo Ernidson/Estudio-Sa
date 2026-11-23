@@ -62,6 +62,26 @@ export class PartRenderer {
     }
     
     this.ctx.restore();
+    const selected = partManager.getSelectedPart();
+    if (selected?.visible && selected.imageElement) {
+      const bone = partManager.rig.getBone(selected.boneId);
+      if (!bone) return;
+      const point = combined.multiply(bone.worldTransform).multiply(selected.localTransform).transformPoint(0, 0);
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+      this.ctx.moveTo(point.x - 10, point.y);
+      this.ctx.lineTo(point.x + 10, point.y);
+      this.ctx.moveTo(point.x, point.y - 10);
+      this.ctx.lineTo(point.x, point.y + 10);
+      this.ctx.lineWidth = 4;
+      this.ctx.strokeStyle = '#17212b';
+      this.ctx.stroke();
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeStyle = '#ffcf33';
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
   }
   
   /**

@@ -369,6 +369,17 @@ function setupEventListeners() {
   
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  const target = document.getElementById('edit-target');
+  target.onchange = () => updateEditPartsPanel();
+  document.getElementById('joint-angle').oninput = event => {
+    const part = app.partManager?.getSelectedPart();
+    const angle = event.target.valueAsNumber;
+    if (part && Number.isFinite(angle)) app.partManager.rig.getBone(part.boneId).poseAt(angle);
+  };
+  document.getElementById('reset-chain').onclick = () => {
+    for (const bone of app.partManager.rig.getAllBones()) bone.restorePose();
+    updateEditPartsPanel();
+  };
   for (const tool of ['scale','rotate']) document.getElementById('btn-'+tool+'-part').onclick=()=>setEditPartsTool(tool);
   document.getElementById('btn-select-part').addEventListener('click', () => setEditPartsTool('select'));
   document.getElementById('btn-move-part').addEventListener('click', () => setEditPartsTool('move'));
@@ -509,11 +520,11 @@ function onMouseDown(e) {
     const selected = app.partManager.getSelectedPart();
     const hitPart = (selected && app.editPartsTool === "rotate" && app.partRenderer.hitsRotationHandle(selected,app.currentCharacterObject,x,y) && selected) || app.partRenderer.hitTestPart(app.partManager, app.currentCharacterObject, x, y);
     if (hitPart) {
-      app.dragPartStart = { x, y, rotation:hitPart.localRotation, scale:{...hitPart.localScale}, position: { ...hitPart.localPosition } };
+      app.dragPartStart = { x, y, boneRotation:app.partManager.rig.getBone(hitPart.boneId).getLocalRotation(), rotation:hitPart.localRotation, scale:{...hitPart.localScale}, position: { ...hitPart.localPosition } };
       app.editPartsSelectedPartId = hitPart.id;
       app.partManager.selectPart(hitPart.id);
       updateEditPartsPanel(hitPart);
-      updatePartPropertiesPanel(hitPart);
+
       e.preventDefault();
       return;
     }
@@ -610,6 +621,18 @@ function onMouseMove(e) {
     const part = app.partManager.getPart(app.editPartsSelectedPartId);
     if (part && app.dragPartStart) {
       const bone = app.partManager.rig.getBone(part.boneId);
+      if (document.getElementById('edit-target').value === 'joint') {
+        const parent = bone.parent?.worldTransform ?? app.partManager.rig.baseTransform;
+        const frame = app.renderer.viewport.clone().multiply(app.currentCharacterObject.transform).multiply(parent);
+        const angleAt = (x, y) => {
+          const point = frame.inverseTransformPoint(x, y);
+          return Math.atan2(point.y - bone.localPosition.y, point.x - bone.localPosition.x);
+        };
+        const start = app.dragPartStart;
+        bone.poseAt(start.boneRotation + (angleAt(x,y) - angleAt(start.x,start.y)) * 180 / Math.PI);
+        document.getElementById('joint-angle').value = bone.getLocalRotation().toFixed(2);
+        return;
+      }
       const inverse = app.renderer.viewport.clone().multiply(app.currentCharacterObject.transform)
         .multiply(bone.worldTransform).getInverse();
       const start = app.dragPartStart;
@@ -625,9 +648,7 @@ function onMouseMove(e) {
         part.setLocalScale(Math.max(.01,start.scale.x*(locked?ratio:Math.abs(dx/(fx||1)))),Math.max(.01,start.scale.y*(locked?ratio:Math.abs(dy/(fy||1)))));
       }
       if (app.editPartsTool==='pivot') {
-        const pt=part.localTransform.inverseTransformPoint(to.x,to.y);
-        part.pivot.x+=pt.x/part.imageWidth; part.pivot.y+=pt.y/part.imageHeight;
-        part.setLocalPosition(to.x,to.y);
+        part.placePivotAt(to.x, to.y);
       }
       updatePartPropertiesPanel(part);
     }
@@ -2342,6 +2363,8 @@ function enterEditPartsMode() {
   app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   
   // Atualiza UI
+  document.getElementById('edit-target').value = 'part';
+  app.editPartsSelectedPartId = app.partManager.getSelectedPart()?.id ?? null;
   updateEditPartsModeUI(true);
   updateStatus('Editar Peças: selecione uma peça para ajustar');
   
@@ -2422,26 +2445,14 @@ function updateEditPartsModeUI(enabled) {
 function setEditPartsTool(tool) {
   app.editPartsTool = tool;
   
-  const selectBtn = document.getElementById('btn-select-part');
-  const moveBtn = document.getElementById('btn-move-part');
-  const pivotBtn = document.getElementById('btn-edit-pivot');
-  
-  // Atualiza estado visual dos botões
-  [selectBtn, moveBtn, pivotBtn].forEach(btn => {
-    if (btn) btn.classList.remove('active');
-  });
-  
-  if (tool === 'select' && selectBtn) selectBtn.classList.add('active');
-  if (tool === 'move' && moveBtn) moveBtn.classList.add('active');
-  if (tool === 'pivot' && pivotBtn) pivotBtn.classList.add('active');
-  
-  // Habilita/desabilita botões de ação baseados na seleção
-  const moveBtnEl = document.getElementById('btn-move-part');
-  const pivotBtnEl = document.getElementById('btn-edit-pivot');
-  const hasSelection = !!app.editPartsSelectedPartId;
-  
-  if (moveBtnEl) moveBtnEl.disabled = !hasSelection;
-  if (pivotBtnEl) pivotBtnEl.disabled = !hasSelection;
+  const ids = {select:'btn-select-part', move:'btn-move-part', rotate:'btn-rotate-part',
+    scale:'btn-scale-part', pivot:'btn-edit-pivot'};
+  for (const [action, id] of Object.entries(ids)) {
+    const button = document.getElementById(id);
+    button.classList.toggle('active', action === tool);
+    button.setAttribute('aria-pressed', String(action === tool));
+    button.disabled = action !== 'select' && !app.editPartsSelectedPartId;
+  }
 }
 
 /**
@@ -2475,6 +2486,18 @@ function updateEditPartsPanel(selectedPart) {
   const parts = app.partManager.getAllParts();
   const selectedId = selectedPart ? selectedPart.id : (app.editPartsSelectedPartId || null);
   
+  const current = app.partManager.getPart(selectedId);
+  const joint = document.getElementById('edit-target').value === 'joint';
+  const toolbar = document.getElementById('edit-parts-toolbar');
+  toolbar.dataset.target = joint ? 'joint' : 'part';
+  document.getElementById('joint-tools').hidden = !joint;
+  const angle = document.getElementById('joint-angle');
+  angle.disabled = !current;
+  angle.value = current ? app.partManager.rig.getBone(current.boneId).getLocalRotation().toFixed(2) : '';
+  document.getElementById('edit-parts-status').textContent = current ? current.name : 'Nenhuma peça selecionada';
+  document.getElementById('edit-parts-count').textContent = parts.length + ' peças';
+  document.getElementById('part-properties-panel')?.remove();
+  if (current && !joint) updatePartPropertiesPanel(current);
   panel.innerHTML = `
     <div class="edit-parts-header">
       <h3 style="margin: 0 0 12px; color: #fff; font-size: 14px;">Peças Recortadas</h3>
@@ -2520,7 +2543,6 @@ function updateEditPartsPanel(selectedPart) {
         app.editPartsSelectedPartId = partId;
         app.partManager.selectPart(partId);
         updateEditPartsPanel(part);
-        updatePartPropertiesPanel(part);
       }
     });
   });
@@ -2665,10 +2687,8 @@ function updatePartPropertiesPanel(part) {
   const jointBtn=document.createElement('button');
   jointBtn.textContent='Pivô na articulação'; jointBtn.className='btn';
   jointBtn.onclick=()=>{
-    const target=part.localTransform.inverseTransformPoint(0,0);
-    part.pivot.x+=target.x/part.imageWidth;
-    part.pivot.y+=target.y/part.imageHeight;
-    part.setLocalPosition(0,0);
+    part.placePivotAt(0, 0);
+    updateStatus('Pivô alinhado com ' + part.boneId + ' · marcador no canvas');
     updatePartPropertiesPanel(part);
   };
   panel.append(jointBtn);
@@ -2687,19 +2707,17 @@ function updatePartPropertiesPanel(part) {
   const resetBtn = document.getElementById('btn-reset-part-adjustments');
   const deleteBtn = document.getElementById('btn-delete-part');
   
-  if (pivotXInput) {
-    pivotXInput.addEventListener('change', () => {
-      part.pivot.x = Math.max(0, Math.min(1, parseFloat(pivotXInput.value)));
-      part.updateLocalTransform();
-      app.renderer.render(app.scene);
-    });
-  }
-  if (pivotYInput) {
-    pivotYInput.addEventListener('change', () => {
-      part.pivot.y = Math.max(0, Math.min(1, parseFloat(pivotYInput.value)));
-      part.updateLocalTransform();
-      app.renderer.render(app.scene);
-    });
+  for (const input of [pivotXInput, pivotYInput]) {
+    input.removeAttribute('min');
+    input.removeAttribute('max');
+    input.onchange = () => {
+      if (!Number.isFinite(input.valueAsNumber)) return;
+      const dx = input === pivotXInput ? (input.valueAsNumber - part.pivot.x) * part.imageWidth : 0;
+      const dy = input === pivotYInput ? (input.valueAsNumber - part.pivot.y) * part.imageHeight : 0;
+      const point = part.localTransform.transformPoint(dx, dy);
+      part.placePivotAt(point.x, point.y);
+      updatePartPropertiesPanel(part);
+    };
   }
   if (xInput) {
     xInput.addEventListener('change', () => {

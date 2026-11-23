@@ -1291,3 +1291,11 @@ body {
 .main-area:not(:has(#piece-map-toolbar:not(.hidden))) #piece-map-panel,
 .main-area:not(:has(#edit-parts-toolbar:not(.hidden))) .panel-left #edit-parts-panel {display:none}
 .panel-left .region-list-item {flex-wrap:wrap}
+
+#edit-parts-toolbar {gap:6px;padding:6px;position:static}
+#edit-parts-toolbar .toolbar-group {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,78px),1fr));gap:4px}
+#edit-parts-toolbar .toolbar-group > * {min-width:0;white-space:normal;line-height:1.2}
+#edit-parts-toolbar .toolbar-group label {display:flex;align-items:center;font-size:11px}
+#edit-parts-toolbar .toolbar-info {display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;overflow-wrap:anywhere}
+#edit-parts-toolbar[data-target=joint] .toolbar-group > :not(#btn-exit-edit-parts) {display:none}
+#joint-tools input {width:6em}

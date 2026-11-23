@@ -36,3 +36,36 @@ test('old polygon-only maps can still generate a cut', () => {
   assert.equal(map.generateMask('head').type,'polygon');
   assert.deepEqual(map.generateMask('head').bounds, {x:12,y:18,width:7,height:10});
 });
+
+test('a pose can be restored after reopening with a rotated bind joint', () => {
+  const shoulder = new Bone({id:'shoulder'});
+  const elbow = new Bone({id:'elbow', localPosition:{x:20,y:0}});
+  shoulder.addChild(elbow);
+  shoulder.setLocalRotation(20);
+  shoulder.computeWorldTransform();
+  const initial = elbow.worldTransform.clone();
+  shoulder.poseAt(65);
+  shoulder.computeWorldTransform();
+  assert.ok(!elbow.worldTransform.equals(initial));
+  const restored = Bone.fromJSON(shoulder.toJSON());
+  restored.addChild(elbow);
+  restored.restorePose();
+  restored.computeWorldTransform();
+  assert.ok(elbow.worldTransform.equals(initial));
+});
+
+test('moving pivot to joint preserves texture under affine canvas and piece transforms', async () => {
+  const {Part} = await import('../src/parts/Part.js');
+  const {createTransform} = await import('../src/core/Transform2D.js');
+  const part = new Part({imageWidth:83,imageHeight:29,localPosition:{x:91,y:-17},
+    localRotation:24,localScale:{x:1.3,y:0.7}});
+  const frame = createTransform(280,140,32,1.8,0.6);
+  const corner = () => frame.clone().multiply(part.localTransform)
+    .transformPoint(-part.pivot.x*part.imageWidth,-part.pivot.y*part.imageHeight);
+  const before = corner();
+  part.placePivotAt(0,0);
+  const after = corner();
+  assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<1e-8);
+  part.computeWorldTransform(frame);
+  assert.deepEqual(part.getWorldPivotPoint(),frame.transformPoint(0,0));
+});

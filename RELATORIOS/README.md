@@ -44,3 +44,4 @@
 - Relatórios mais antigos podem ter menos detalhes (formato anterior à padronização).
 - Commits indicados referem-se ao hash do commit base antes das alterações da tarefa.
 - Para atualizações sem commit, o estado reflete alterações locais pendentes.
+- [Editor de peças, pivô e cadeia do braço](2026-11-23_cadeia_braco.md)

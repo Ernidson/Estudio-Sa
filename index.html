@@ -193,6 +193,11 @@
           
           <!-- Barra fixa do Editor de Peças (sempre visível no modo Editar Peças) -->
           <div id="edit-parts-toolbar" class="edit-parts-toolbar hidden">
+            <select id="edit-target" aria-label="Modo de edição"><option value="part">Ajustar Peça</option><option value="joint">Mover Articulação</option></select>
+            <div id="joint-tools" hidden>
+              <label>Rotação do osso (°) <input type="number" id="joint-angle" step="1"></label>
+              <button class="btn" id="reset-chain">Repor pose</button>
+            </div>
             <div class="toolbar-group">
               <button id="btn-select-part" class="btn btn-secondary" title="Selecionar Peça">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

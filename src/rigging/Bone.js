@@ -31,6 +31,7 @@ export class Bone {
     
     // Hierarquia
     this.children = [];
+    this.poseReferenceAngle = data.poseReferenceAngle ?? null;
     this.parent = null;
     
     // Visual
@@ -85,6 +86,17 @@ export class Bone {
   /**
    * Adiciona rotação local (relativa)
    */
+  poseAt(degrees) {
+    this.poseReferenceAngle ??= this.getLocalRotation();
+    this.setLocalRotation(degrees);
+  }
+
+  restorePose() {
+    if (this.poseReferenceAngle === null) return;
+    this.setLocalRotation(this.poseReferenceAngle);
+    this.poseReferenceAngle = null;
+  }
+
   rotateLocal(deltaDegrees) {
     const currentRotation = this.getLocalRotation();
     this.setLocalRotation(currentRotation + deltaDegrees);
@@ -216,6 +228,7 @@ export class Bone {
       parentId: this.parentId,
       localPosition: { ...this.localPosition },
       localTransform: this.localTransform.toJSON(),
+      poseReferenceAngle: this.poseReferenceAngle,
       length: this.length,
       color: this.color,
       visible: this.visible,

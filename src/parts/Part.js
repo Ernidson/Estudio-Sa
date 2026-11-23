@@ -83,6 +83,13 @@ export class Part {
   /**
    * Obtém posição local
    */
+  placePivotAt(x, y) {
+    const delta = this.localTransform.inverseTransformPoint(x, y);
+    this.pivot = { x: this.pivot.x + delta.x / this.imageWidth,
+      y: this.pivot.y + delta.y / this.imageHeight };
+    this.setLocalPosition(x, y);
+  }
+
   getLocalPosition() {
     return { ...this.localPosition };
   }
@@ -138,11 +145,7 @@ export class Part {
    */
   getWorldPivotPoint() {
     if (!this.worldTransform) return { x: 0, y: 0 };
-    const w = this.imageWidth;
-    const h = this.imageHeight;
-    const pivotX = w * this.pivot.x;
-    const pivotY = h * this.pivot.y;
-    return this.worldTransform.transformPoint(pivotX, pivotY);
+    return this.worldTransform.transformPoint(0, 0);
   }
   
   /**
