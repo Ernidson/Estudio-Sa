@@ -74,5 +74,17 @@ export function setupStation(panel,getCharacter,getScene,updated) {
     }
     refresh();
   };
-  return {refresh,bar};
+  function drawGrips(ctx,viewport) {
+    if(!panel.open || panel.closest('.hidden'))return;
+    const structure=bar();if(!structure)return;
+    const transform=viewport.clone().multiply(structure.transform);
+    ctx.save();ctx.lineWidth=2;ctx.strokeStyle='#ffcd48';ctx.fillStyle='#ffcd48';
+    getCharacter().pullup.grips.forEach((g,i)=>{
+      const p=transform.transformPoint(g.x,g.y);
+      ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.stroke();
+      ctx.fillText(i?'D':'E',p.x+9,p.y);
+    });
+    ctx.restore();
+  }
+  return {refresh,bar,drawGrips};
 }

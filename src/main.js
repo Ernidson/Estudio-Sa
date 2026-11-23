@@ -207,6 +207,8 @@ function renderLoop(now) {
     if (obj !== original && obj.partManager) app.partRenderer.drawParts(obj.partManager, obj);
   }
   
+  if (app.isEditPartsMode) app.station.drawGrips(app.renderer.ctx,app.renderer.viewport);
+
   // Render preview de recorte se no modo de recorte
   if (app.isCuttingMode && app.cuttingData && app.partManager && app.partRenderer) {
     drawCuttingPreview();

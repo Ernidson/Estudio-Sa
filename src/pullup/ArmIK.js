@@ -32,7 +32,18 @@ export function constrainArms(obj,bar) {
     const grip=config.grips[i], contact=config.contacts[i];
     const world=bar.transform.transformPoint(grip.x,grip.y);
     const local=obj.transform.inverseTransformPoint(world.x,world.y);
-    const target=frame.inverseTransformPoint(local.x-contact.point.x+contact.wrist.x,local.y-contact.point.y+contact.wrist.y);
+    // The raster contact follows local hand edits. Rotate that offset into
+    // the held orientation, leaving the user's piece transform intact.
+    const hand=obj.partManager.getAllParts().find(p=>p.boneId===wrist.id);
+    let ox=contact.point.x-contact.wrist.x, oy=contact.point.y-contact.wrist.y;
+    if(hand){
+      const texel=hand.localTransform.transformPoint((.5-hand.pivot.x)*hand.imageWidth,(.45-hand.pivot.y)*hand.imageHeight);
+      const current=wrist.worldTransform.transformVector(texel.x,texel.y);
+      const angle=(contact.angle-wrist.worldTransform.decompose().rotation)*Math.PI/180;
+      ox=current.x*Math.cos(angle)-current.y*Math.sin(angle);
+      oy=current.x*Math.sin(angle)+current.y*Math.cos(angle);
+    }
+    const target=frame.inverseTransformPoint(local.x-ox,local.y-oy);
     const a=pointInParent(frame,shoulder), b=pointInParent(frame,elbow), c=pointInParent(frame,wrist);
     const angleDifference=wrist.worldTransform.decompose().rotation-contact.angle;
     if(Math.hypot(c.x-target.x,c.y-target.y)<1e-7 && Math.abs(Math.sin(angleDifference*Math.PI/360))<1e-9)continue;

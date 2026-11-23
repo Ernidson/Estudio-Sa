@@ -9,6 +9,11 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-23 | Validação da barra fixa | Fase 2D.7 E | Testado em Chromium | [Relatório](2026-11-23_2D7_E.md) | PR #1 |
+| 2026-11-23 | Ciclo de cinco segundos | Fase 2D.7 D | Testado em Chromium | [Relatório](2026-11-23_2D7_D.md) | 08cb454 |
+| 2026-11-23 | Correções raster por pose | Fase 2D.7 C | Testado em Chromium | [Relatório](2026-11-23_2D7_C.md) | c3a7a04 |
+| 2026-11-23 | IK bilateral | Fase 2D.7 B | Testado em Chromium | [Relatório](2026-11-23_2D7_B.md) | f070854 |
+| 2026-11-23 | Estação e pegas | Fase 2D.7 A | Testado em Chromium | [Relatório](2026-11-23_2D7_A.md) | e516a70 |
 | 2026-11-23 | Timeline e poses | Ciclo do braço de três segundos | Testado em Chromium | [Relatório](2026-11-23_2D6_C.md) | PR #1 |
 | 2026-11-23 | Uniões do braço esquerdo | Comparação de texturas em quatro ângulos | Protótipo | [Relatório](2026-11-23_2D6_B.md) | PR #1 |
 | 2026-11-23 | Interface do editor | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_interface_editor.md) | PR #1 |
@@ -49,8 +54,3 @@
 - [Editor de peças, pivô e cadeia do braço](2026-11-23_cadeia_braco.md)
 
 - [Fase 2D.6 A — geração em lote e reabertura](2026-11-23_2D6_A.md)
-
-- [2D.7 A — preparação da cena](2026-11-23_2D7_A.md)
-- [2D.7 B — IK bilateral](2026-11-23_2D7_B.md)
-- [2D.7 C — correções por pose](2026-11-23_2D7_C.md)
-- [2D.7 D — ciclo na timeline](2026-11-23_2D7_D.md)

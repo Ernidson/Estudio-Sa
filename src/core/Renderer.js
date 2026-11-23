@@ -189,7 +189,7 @@ export class Renderer {
     }
 
     // Desenha eixos
-    this.drawAxes();
+    if (!preview) this.drawAxes();
 
     // Objetos visíveis ordenados
     const objects = scene.getVisibleObjects();

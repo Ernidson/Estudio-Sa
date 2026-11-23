@@ -57,3 +57,20 @@ with sync_playwright() as pw, TemporaryDirectory() as tmp:
     }""")
     print(result)
     assert result["drift"]<.01 and result["length"]<.01 and not result["flip"] and not errors
+    extra=page.evaluate("""async ()=>{
+      const o=app.currentCharacterObject,c=o.pullup,rig=o.rig,b=rig.getRoot(),hand=o.partManager.getAllParts().find(p=>p.boneId==='pulso_esquerdo');
+      const next=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      b.setLocalPosition(b.localPosition.x,c.restY-120);await next();
+      c.fixed=false;
+      const wrist=rig.getBone(hand.boneId), before=wrist.getWorldPoint();
+      b.setLocalPosition(b.localPosition.x,b.localPosition.y-10);await next();
+      const free=Math.abs(wrist.getWorldPoint().y-before.y);
+      c.grips[0].x-=12;c.fixed=true;
+      hand.setLocalPosition(hand.localPosition.x+3,hand.localPosition.y-2);
+      const saved={...hand.localPosition};await next();
+      const pt=o.transform.clone().multiply(wrist.worldTransform).multiply(hand.localTransform)
+        .transformPoint((.5-hand.pivot.x)*hand.imageWidth,(.45-hand.pivot.y)*hand.imageHeight);
+      const g=c.grips[0],target=app.station.bar().transform.transformPoint(g.x,g.y);
+      return {free,drift:Math.hypot(pt.x-target.x,pt.y-target.y),saved:saved.x===hand.localPosition.x && saved.y===hand.localPosition.y};
+    }""")
+    assert abs(extra['free']-10)<.001 and extra['drift']<.001 and extra['saved'],extra
