@@ -1,3 +1,4 @@
+import {generateBatch, undoBatch, hasBatch} from './parts/BatchParts.js';
 import { refreshTextures } from './parts/RasterPieces.js';
 import { encodeRegion, paintRegion, rasterPath } from './segmentation/RasterRegion.js';
 /**
@@ -363,6 +364,31 @@ function setupEventListeners() {
   
   // Mapa de Peças (Fase 2B.1)
   document.getElementById('btn-piece-map').addEventListener('click', togglePieceMapMode);
+  const generateAll = document.getElementById('generate-all');
+  const undo = document.getElementById('undo-batch');
+  const report = document.getElementById('batch-report');
+  generateAll.onclick = async () => {
+    const obj = app.currentCharacterObject;
+    const manager = obj.partManager ??= new PartManager(obj, obj.rig, app.renderer.rigRenderer, app.renderer);
+    app.partManager = manager;
+    generateAll.disabled = undo.disabled = true;
+    try {
+      await generateBatch(manager, obj.pieceMap, message => { report.textContent = message; });
+    } finally {
+      generateAll.disabled = false;
+      undo.disabled = !hasBatch(manager);
+      updatePieceMapPanel();
+      updatePieceCountDisplay();
+    }
+  };
+  undo.onclick = () => {
+    if (!confirm('Eliminar as peças criadas pelo último lote, incluindo ajustes posteriores?')) return;
+    undoBatch(app.partManager);
+    undo.disabled = true;
+    report.textContent = 'Geração em lote desfeita.';
+    updatePieceMapPanel();
+    updatePieceCountDisplay();
+  };
   document.getElementById('btn-generate-piece').addEventListener('click', generatePieceFromMap);
   document.getElementById('btn-exit-piece-map').addEventListener('click', exitPieceMapMode);
   document.getElementById('btn-preview-piece').addEventListener('click', () => previewPieceFromMap());
@@ -1043,6 +1069,13 @@ async function openProject() {
     app.selectionManager.clearSelection();
     app.renderer.fitToObjects(app.scene.getVisibleObjects());
     updateLayersPanel();
+    const character = scene.objects.find(obj => obj.rig && obj.partManager?.parts.size) ??
+      scene.objects.find(obj => obj.rig);
+    if (character) {
+      app.selectionManager.selectObject(character);
+      enterRiggingMode(character);
+      if (character.partManager?.parts.size) enterEditPartsMode();
+    }
     updateStatus(`Projeto aberto: ${project.name}`);
   } catch (err) {
     console.error('Erro ao abrir projeto:', err);
@@ -1490,6 +1523,8 @@ function togglePieceMapMode() {
  * Entra no modo Mapa de Peças
  */
 function enterPieceMapMode() {
+  document.getElementById('batch-report').textContent = '';
+  document.getElementById('undo-batch').disabled = !hasBatch(app.selectionManager.getSelectedObject()?.partManager);
   const obj = app.selectionManager.getSelectedObject();
   
   if (!obj || !obj.hasRig || !obj.rig) {

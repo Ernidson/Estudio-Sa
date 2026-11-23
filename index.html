@@ -136,6 +136,8 @@
           
           <!-- Barra fixa do Mapa de Peças (sempre visível no modo Mapa de Peças) -->
           <div id="piece-map-toolbar" class="piece-map-toolbar hidden">
+            <div><button class="btn" id="generate-all">Gerar Todas as Peças</button><button class="btn" id="undo-batch" disabled>Desfazer lote</button></div>
+            <output id="batch-report" style="white-space:pre-line;max-height:6em;overflow:auto" aria-live="polite"></output>
             <div class="toolbar-group">
               <button id="btn-preview-piece" class="btn btn-secondary" title="Pré-visualizar Peça">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

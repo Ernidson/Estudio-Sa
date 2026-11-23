@@ -128,6 +128,12 @@ export class PartManager {
       )
     }
     
+    if (mask.type === 'raster') {
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      if (!pixels.some((value, index) => index % 4 === 3 && value > 0)) {
+        throw Error('sem píxeis visíveis na máscara');
+      }
+    }
     // Converte para Data URL
     const imageData = canvas.toDataURL('image/png');
     
