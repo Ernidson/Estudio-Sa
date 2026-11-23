@@ -52,3 +52,4 @@
 
 - [2D.7 A — preparação da cena](2026-11-23_2D7_A.md)
 - [2D.7 B — IK bilateral](2026-11-23_2D7_B.md)
+- [2D.7 C — correções por pose](2026-11-23_2D7_C.md)

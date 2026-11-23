@@ -1,3 +1,4 @@
+import {drawCorrectives,elevation} from '../pullup/Correctives.js';
 import {drawArmJoints} from './ArmJointPatch.js';
 /**
  * PartRenderer - Renderiza peças recortadas sobre o personagem
@@ -33,6 +34,15 @@ export class PartRenderer {
     // Garante que transformações mundiais dos bones estão atualizadas
     partManager.rig.computeWorldTransforms();
     
+    const output=this.ctx;
+    const isolate=characterObject.pullup?.patches?.length && characterObject.pullup.correct!==false && elevation(characterObject)>0;
+    if(isolate) {
+      const layer=this.correctiveLayer??=document.createElement('canvas');
+      if(layer.width!==output.canvas.width)layer.width=output.canvas.width;
+      if(layer.height!==output.canvas.height)layer.height=output.canvas.height;
+      this.ctx=layer.getContext('2d');
+      this.ctx.clearRect(0,0,layer.width,layer.height);
+    }
     this.ctx.save();
     
     // Aplica transformação do personagem + viewport
@@ -64,7 +74,12 @@ export class PartRenderer {
       this.drawPart(part, partManager.rig);
     }
     
+    drawCorrectives(this.ctx,characterObject);
     this.ctx.restore();
+    if(isolate) {
+      this.ctx=output;
+      output.drawImage(this.correctiveLayer,0,0);
+    }
     const selected = partManager.getSelectedPart();
     if (selected?.visible && selected.imageElement) {
       const bone = partManager.rig.getBone(selected.boneId);

@@ -34,6 +34,8 @@ export function constrainArms(obj,bar) {
     const local=obj.transform.inverseTransformPoint(world.x,world.y);
     const target=frame.inverseTransformPoint(local.x-contact.point.x+contact.wrist.x,local.y-contact.point.y+contact.wrist.y);
     const a=pointInParent(frame,shoulder), b=pointInParent(frame,elbow), c=pointInParent(frame,wrist);
+    const angleDifference=wrist.worldTransform.decompose().rotation-contact.angle;
+    if(Math.hypot(c.x-target.x,c.y-target.y)<1e-7 && Math.abs(Math.sin(angleDifference*Math.PI/360))<1e-9)continue;
     const solution=twoLink(a,target,Math.hypot(b.x-a.x,b.y-a.y),Math.hypot(c.x-b.x,c.y-b.y),i===0?1:-1);
     aim(shoulder,elbow,solution.upper);
     shoulder.computeWorldTransform(frame);

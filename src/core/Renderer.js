@@ -179,7 +179,7 @@ export class Renderer {
   /**
    * Renderiza a cena completa
    */
-  render(scene, originalObject = null) {
+  render(scene, originalObject = null, preview = false) {
     // Limpa canvas
     this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
@@ -199,13 +199,13 @@ export class Renderer {
       this.renderObject(obj, obj === originalObject);
       
       // Renderiza rig se existir
-      if (obj.rig && obj.hasRig) {
+      if (!preview && obj.rig && obj.hasRig) {
         this.rigRenderer.drawRig(obj.rig, obj);
       }
     }
 
     // Renderiza seleção por cima
-    if (this.selectedObject) {
+    if (!preview && this.selectedObject) {
       this.renderSelection(this.selectedObject);
     }
   }

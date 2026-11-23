@@ -1,3 +1,4 @@
+import {correctiveEditor} from './pullup/Correctives.js';
 import {constrainArms} from './pullup/ArmIK.js';
 import {setupStation} from './pullup/Station.js';
 import {timelineEditor} from './animation/Timeline.js';
@@ -199,7 +200,7 @@ function renderLoop(now) {
     if(status.textContent!==message)status.textContent=message;
   }
   const original = app.isCalibrationMode ? app.currentCharacterObject : null;
-  app.renderer.render(app.scene, original);
+  app.renderer.render(app.scene, original, app.isEditPartsMode && !!app.currentCharacterObject?.pullup);
   
   // Render peças recortadas por cima
   for (const obj of app.scene.getVisibleObjects()) {
@@ -405,6 +406,7 @@ function setupEventListeners() {
   
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  app.corrections = correctiveEditor(document.querySelector("#pose-corrections"),()=>app.currentCharacterObject);
   app.station = setupStation(document.querySelector("#pullup-station"),()=>app.currentCharacterObject,()=>app.scene,()=>{updateLayersPanel();app.renderer.fitToObjects(app.scene.getVisibleObjects());});
   app.timeline = timelineEditor(document.getElementById('animation-editor'), () => updateEditPartsPanel());
   const target = document.getElementById('edit-target');
@@ -2413,6 +2415,7 @@ function enterEditPartsMode() {
   app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   
   // Atualiza UI
+  app.corrections.sync();
   app.station.refresh();
   app.timeline.select(obj);
   document.getElementById('joint-patches').checked = obj.armJointPatches !== false;

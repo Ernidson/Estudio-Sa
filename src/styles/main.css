@@ -1308,3 +1308,4 @@ body {
 #animation-editor input[name=cursor] {display:block}
 #animation-editor label:has(input[name=cursor]) {display:block}
 #pullup-station label {display:inline-block;margin:3px} #pullup-station input[type=number]{width:6em} #pullup-station input[type=file]{max-width:100%}
+#pose-corrections label{display:inline-block;margin:3px} #pose-corrections input[type=number]{width:5em} #pose-corrections input[type=file]{max-width:100%}
