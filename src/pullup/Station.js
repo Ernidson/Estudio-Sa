@@ -35,8 +35,8 @@ export async function attachBar(scene,obj,file) {
   bar.imageElement=image;
   bar.transform.compose((points[0].x+points[1].x)/2,(points[0].y+points[1].y)/2-rail*scale,0,scale,scale);
   scene.addObject(bar);bar.layerOrder=Math.min(...scene.objects.map(o=>o.layerOrder))-1;scene.sortObjects();
-  obj.pullup={barId:bar.id,fixed:true,height:240,contacts,
-    grips:points.map(p=>({x:bar.transform.inverseTransformPoint(p.x,p.y).x,y:rail}))};
+  obj.pullup={barId:bar.id,fixed:true,height:280,restY:obj.rig.getRoot().localPosition.y,contacts,
+    grips:points.map(p=>({x:bar.transform.inverseTransformPoint(p.x,p.y).x,y:bar.transform.inverseTransformPoint(p.x,p.y).y}))};
   return bar;
 }
 

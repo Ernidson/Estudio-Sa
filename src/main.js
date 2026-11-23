@@ -1,3 +1,4 @@
+import {constrainArms} from './pullup/ArmIK.js';
 import {setupStation} from './pullup/Station.js';
 import {timelineEditor} from './animation/Timeline.js';
 import {generateBatch, undoBatch, hasBatch} from './parts/BatchParts.js';
@@ -191,6 +192,12 @@ async function init() {
  */
 function renderLoop(now) {
   app.timeline?.tick(now);
+  if (app.isEditPartsMode && app.currentCharacterObject?.pullup?.fixed) {
+    const error=constrainArms(app.currentCharacterObject,app.station.bar());
+    const status=document.querySelector('#pullup-station [name=status]');
+    const message=error>0.1 ? 'Pega fora de alcance · '+error.toFixed(1)+' px' : '';
+    if(status.textContent!==message)status.textContent=message;
+  }
   const original = app.isCalibrationMode ? app.currentCharacterObject : null;
   app.renderer.render(app.scene, original);
   

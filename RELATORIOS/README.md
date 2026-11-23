@@ -51,3 +51,4 @@
 - [Fase 2D.6 A — geração em lote e reabertura](2026-11-23_2D6_A.md)
 
 - [2D.7 A — preparação da cena](2026-11-23_2D7_A.md)
+- [2D.7 B — IK bilateral](2026-11-23_2D7_B.md)
