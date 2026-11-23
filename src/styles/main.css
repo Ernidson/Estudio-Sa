@@ -1299,3 +1299,11 @@ body {
 #edit-parts-toolbar .toolbar-info {display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;overflow-wrap:anywhere}
 #edit-parts-toolbar[data-target=joint] .toolbar-group > :not(#btn-exit-edit-parts) {display:none}
 #joint-tools input {width:6em}
+#animation-editor {padding:4px;border:1px solid var(--border-color)}
+#animation-editor summary {cursor:pointer}
+#animation-editor label {display:inline-block;margin:3px}
+#animation-editor input[type=number] {width:5em}
+#animation-editor input[type=range], #animation-editor select[name=keys] {width:100%}
+#animation-editor button {white-space:normal;padding:4px 6px}
+#animation-editor input[name=cursor] {display:block}
+#animation-editor label:has(input[name=cursor]) {display:block}

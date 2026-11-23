@@ -195,6 +195,20 @@
           
           <!-- Barra fixa do Editor de Peças (sempre visível no modo Editar Peças) -->
           <div id="edit-parts-toolbar" class="edit-parts-toolbar hidden">
+            <details id="animation-editor"><summary>Animação</summary>
+              <label>Tempo <output name="seconds">0.00 s</output><datalist id="animation-ticks"></datalist><input list="animation-ticks" type="range" name="cursor" min="0" max="3" value="0" step="0.033333"></label>
+              <div><button class="btn" value="play">Reproduzir</button><button class="btn" value="pause">Pausar</button><button class="btn" value="stop">Parar</button><button class="btn" value="start">Início</button></div>
+              <label><input name="loop" type="checkbox"> Repetir</label>
+              <label>Duração (s) <input name="duration" type="number" min="0.1" step="0.1"></label>
+              <label>FPS <select name="fps"><option>24</option><option>30</option></select></label>
+              <select aria-label="Keyframes" name="keys"></select>
+              <details><summary>Transformação do osso</summary>
+                <select name="bone" aria-label="Osso a animar"></select>
+                <label>X <input type="number" name="x" step="0.1"></label><label>Y <input type="number" name="y" step="0.1"></label><label>Rotação (°) <input type="number" name="rotation" step="1"></label><label>Escala X <input type="number" name="scaleX" step="0.01"></label><label>Escala Y <input type="number" name="scaleY" step="0.01"></label>
+              </details>
+              <label>Curva de saída <select name="curve"><option>linear</option><option>ease-in</option><option>ease-out</option><option>ease-in-out</option></select></label>
+              <div><button class="btn" value="add">Adicionar keyframe</button><button class="btn" value="remove">Remover keyframe</button><button class="btn" value="copy">Copiar pose</button><button class="btn" value="paste">Colar pose</button><button class="btn" value="reset">Repor pose inicial</button><button class="btn" value="demo">Demonstração do braço · 3 s</button></div>
+            </details>
             <select id="edit-target" aria-label="Modo de edição"><option value="part">Ajustar Peça</option><option value="joint">Mover Articulação</option></select>
             <div id="joint-tools" hidden>
               <label><input type="checkbox" id="joint-patches"> Suavizar uniões do braço esquerdo</label>

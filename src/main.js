@@ -1,3 +1,4 @@
+import {timelineEditor} from './animation/Timeline.js';
 import {generateBatch, undoBatch, hasBatch} from './parts/BatchParts.js';
 import { refreshTextures } from './parts/RasterPieces.js';
 import { encodeRegion, paintRegion, rasterPath } from './segmentation/RasterRegion.js';
@@ -187,7 +188,8 @@ async function init() {
 /**
  * Loop de renderização
  */
-function renderLoop() {
+function renderLoop(now) {
+  app.timeline?.tick(now);
   const original = app.isCalibrationMode ? app.currentCharacterObject : null;
   app.renderer.render(app.scene, original);
   
@@ -395,6 +397,7 @@ function setupEventListeners() {
   
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  app.timeline = timelineEditor(document.getElementById('animation-editor'), () => updateEditPartsPanel());
   const target = document.getElementById('edit-target');
   document.getElementById('joint-patches').onchange = event => {
     app.currentCharacterObject.armJointPatches = event.target.checked;
@@ -2401,6 +2404,7 @@ function enterEditPartsMode() {
   app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   
   // Atualiza UI
+  app.timeline.select(obj);
   document.getElementById('joint-patches').checked = obj.armJointPatches !== false;
   document.getElementById('edit-target').value = 'part';
   app.editPartsSelectedPartId = app.partManager.getSelectedPart()?.id ?? null;
@@ -2424,6 +2428,7 @@ function enterEditPartsMode() {
 function exitEditPartsMode() {
   if (!app.isEditPartsMode) return;
   
+  app.timeline.select(null);
   app.isEditPartsMode = false;
   app.editPartsSelectedPartId = null;
   app.editPartsTool = 'select';
