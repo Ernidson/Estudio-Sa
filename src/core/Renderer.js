@@ -179,7 +179,7 @@ export class Renderer {
   /**
    * Renderiza a cena completa
    */
-  render(scene) {
+  render(scene, originalObject = null) {
     // Limpa canvas
     this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
@@ -196,7 +196,7 @@ export class Renderer {
 
     // Renderiza cada objeto
     for (const obj of objects) {
-      this.renderObject(obj);
+      this.renderObject(obj, obj === originalObject);
       
       // Renderiza rig se existir
       if (obj.rig && obj.hasRig) {
@@ -312,7 +312,7 @@ export class Renderer {
   /**
    * Renderiza um objeto
    */
-  renderObject(obj) {
+  renderObject(obj, showOriginal = false) {
     if (!obj.imageElement || !obj.visible) return;
 
     const ctx = this.ctx;
@@ -337,7 +337,7 @@ export class Renderer {
     ctx.transform(a, b, c, d, e, f);
 
     // Desenha imagem centrada na origem
-    ctx.drawImage(remainingImage(obj), -w / 2, -h / 2, w, h);
+    ctx.drawImage(showOriginal ? obj.imageElement : remainingImage(obj), -w / 2, -h / 2, w, h);
 
     ctx.restore();
   }

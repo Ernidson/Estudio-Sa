@@ -187,12 +187,12 @@ async function init() {
  * Loop de renderização
  */
 function renderLoop() {
-  // Render cena normal (inclui rig)
-  app.renderer.render(app.scene);
+  const original = app.isCalibrationMode ? app.currentCharacterObject : null;
+  app.renderer.render(app.scene, original);
   
   // Render peças recortadas por cima
   for (const obj of app.scene.getVisibleObjects()) {
-    if (obj.partManager) app.partRenderer.drawParts(obj.partManager, obj);
+    if (obj !== original && obj.partManager) app.partRenderer.drawParts(obj.partManager, obj);
   }
   
   // Render preview de recorte se no modo de recorte
@@ -2672,6 +2672,18 @@ function updatePartPropertiesPanel(part) {
     updatePartPropertiesPanel(part);
   };
   panel.append(jointBtn);
+  if (part.regionId) {
+    const maskBtn=document.createElement('button');
+    maskBtn.textContent='Editar máscara'; maskBtn.className='btn';
+    maskBtn.onclick=()=>{
+      enterCalibrationMode();
+      setCalibrationTool('regions');
+      app.pieceMap.selectRegion(part.regionId);
+      app.calibrationSelectedRegionId=part.regionId;
+      updateCalibrationPanel();
+    };
+    panel.append(maskBtn);
+  }
   const resetBtn = document.getElementById('btn-reset-part-adjustments');
   const deleteBtn = document.getElementById('btn-delete-part');
   
@@ -2871,7 +2883,7 @@ async function generatePieceFromMap() {
     
     // Oculta a região correspondente na imagem base (marca para ocultação futura)
     region.generated = true;
-    region.visible = false; // Oculta a região colorida
+    region.visible = Boolean(region.raster);
     
     // Sai do modo mapa de peças
     exitPieceMapMode();
