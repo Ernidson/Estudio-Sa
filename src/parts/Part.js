@@ -11,6 +11,7 @@ export class Part {
     this.id = data.id || generateId('part');
     this.name = data.name || 'Peça';
     this.sourceObjectId = data.sourceObjectId || null; // ID do SceneObject original
+    this.regionId = data.regionId || null;
     this.boneId = data.boneId || null; // ID do osso ao qual está ligada
     
     // Dados da imagem recortada
@@ -180,6 +181,7 @@ export class Part {
       id: this.id,
       name: this.name,
       sourceObjectId: this.sourceObjectId,
+      regionId: this.regionId,
       boneId: this.boneId,
       imageData: this.imageData,
       imageWidth: this.imageWidth,

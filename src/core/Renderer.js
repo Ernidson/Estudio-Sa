@@ -1,3 +1,4 @@
+import { remainingImage } from '../parts/RasterPieces.js';
 /**
  * Renderer - Renderização 2D no Canvas
  */
@@ -336,7 +337,7 @@ export class Renderer {
     ctx.transform(a, b, c, d, e, f);
 
     // Desenha imagem centrada na origem
-    ctx.drawImage(obj.imageElement, -w / 2, -h / 2, w, h);
+    ctx.drawImage(remainingImage(obj), -w / 2, -h / 2, w, h);
 
     ctx.restore();
   }

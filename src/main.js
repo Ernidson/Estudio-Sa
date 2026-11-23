@@ -1,3 +1,4 @@
+import { refreshTextures } from './parts/RasterPieces.js';
 import { encodeRegion, paintRegion, rasterPath } from './segmentation/RasterRegion.js';
 /**
  * Rigby Studio 2D - Ponto de entrada principal
@@ -368,6 +369,7 @@ function setupEventListeners() {
   
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  for (const tool of ['scale','rotate']) document.getElementById('btn-'+tool+'-part').onclick=()=>setEditPartsTool(tool);
   document.getElementById('btn-select-part').addEventListener('click', () => setEditPartsTool('select'));
   document.getElementById('btn-move-part').addEventListener('click', () => setEditPartsTool('move'));
   document.getElementById('btn-edit-pivot').addEventListener('click', () => setEditPartsTool('pivot'));
@@ -444,14 +446,16 @@ function onResize() {
 }
 
 function brushRegion(event, x, y) {
-  if (!app.isCalibrationMode || app.calibrationTool !== 'regions' || !(event.shiftKey || event.altKey)) return false;
+  const map = app.pieceMap;
+  if (!app.isCalibrationMode || app.calibrationTool !== 'regions' || !(event.shiftKey || event.altKey || map?.brushMode)) return false;
   const region = app.pieceMap.getSelectedRegion();
   if (!region?.raster || !app.silhouetteAnalyzer) return false;
   const obj = app.currentCharacterObject;
   const point = app.pieceMap.screenToCharacterLocal(x, y);
-  paintRegion(app.pieceMap.getAllRegions(), event.altKey ? null : region,
+  paintRegion(app.pieceMap.getAllRegions(), event.altKey || (!event.shiftKey && map.brushMode === "erase") ? null : region,
     Math.floor(point.x + obj.imageWidth / 2), Math.floor(point.y + obj.imageHeight / 2),
-    8, app.silhouetteAnalyzer.getAlphaData(), obj.imageWidth, obj.imageHeight);
+    map.brushRadius || 8, app.silhouetteAnalyzer.getAlphaData(), obj.imageWidth, obj.imageHeight);
+  map.brushDirty = true;
   return true;
 }
 
@@ -502,9 +506,10 @@ function onMouseDown(e) {
   // Modo Editar Peças: seleção e arraste de peças
   if (app.isEditPartsMode && app.partManager) {
     // Tenta selecionar peça
-    const hitPart = app.partRenderer.hitTestPart(app.partManager, app.currentCharacterObject, x, y);
+    const selected = app.partManager.getSelectedPart();
+    const hitPart = (selected && app.editPartsTool === "rotate" && app.partRenderer.hitsRotationHandle(selected,app.currentCharacterObject,x,y) && selected) || app.partRenderer.hitTestPart(app.partManager, app.currentCharacterObject, x, y);
     if (hitPart) {
-      app.dragPartStart = { x, y, position: { ...hitPart.localPosition } };
+      app.dragPartStart = { x, y, rotation:hitPart.localRotation, scale:{...hitPart.localScale}, position: { ...hitPart.localPosition } };
       app.editPartsSelectedPartId = hitPart.id;
       app.partManager.selectPart(hitPart.id);
       updateEditPartsPanel(hitPart);
@@ -603,14 +608,27 @@ function onMouseMove(e) {
   // Modo Editar Peças: arraste de peça
   if (app.isEditPartsMode && app.partManager && app.isMouseDown && app.editPartsSelectedPartId) {
     const part = app.partManager.getPart(app.editPartsSelectedPartId);
-    if (part && app.editPartsTool === 'move' && app.dragPartStart) {
+    if (part && app.dragPartStart) {
       const bone = app.partManager.rig.getBone(part.boneId);
       const inverse = app.renderer.viewport.clone().multiply(app.currentCharacterObject.transform)
         .multiply(bone.worldTransform).getInverse();
       const start = app.dragPartStart;
       const from = inverse.transformPoint(start.x, start.y);
       const to = inverse.transformPoint(x, y);
-      part.setLocalPosition(start.position.x + to.x - from.x, start.position.y + to.y - from.y);
+      const dx=to.x-part.localPosition.x, dy=to.y-part.localPosition.y;
+      const fx=from.x-start.position.x, fy=from.y-start.position.y;
+      if (app.editPartsTool==='move') part.setLocalPosition(start.position.x + to.x-from.x,start.position.y + to.y-from.y);
+      if (app.editPartsTool==='rotate') part.setLocalRotation(start.rotation+(Math.atan2(dy,dx)-Math.atan2(fy,fx))*180/Math.PI);
+      if (app.editPartsTool==='scale') {
+        const ratio=Math.hypot(dx,dy)/Math.max(1,Math.hypot(fx,fy));
+        const locked=document.getElementById('lock-scale').checked;
+        part.setLocalScale(Math.max(.01,start.scale.x*(locked?ratio:Math.abs(dx/(fx||1)))),Math.max(.01,start.scale.y*(locked?ratio:Math.abs(dy/(fy||1)))));
+      }
+      if (app.editPartsTool==='pivot') {
+        const pt=part.localTransform.inverseTransformPoint(to.x,to.y);
+        part.pivot.x+=pt.x/part.imageWidth; part.pivot.y+=pt.y/part.imageHeight;
+        part.setLocalPosition(to.x,to.y);
+      }
       updatePartPropertiesPanel(part);
     }
     updateCanvasInfo(x, y);
@@ -679,6 +697,7 @@ function onMouseMove(e) {
  * Mouse up
  */
 function onMouseUp(e) {
+  if (app.pieceMap?.brushDirty) { refreshTextures(app.currentCharacterObject); app.pieceMap.brushDirty = false; }
   app.panOrigin = null;
   const rect = app.canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -1870,7 +1889,25 @@ function updateCalibrationPanel() {
       app.pieceMap.selectRegion(select.value);
       updateCalibrationPanel();
     };
-    calibrationPanel.replaceChildren(select, document.createTextNode(' Shift + arrastar para pintar. Alt + arrastar para apagar.'));
+    calibrationPanel.replaceChildren(select);
+    for (const [mode,caption] of [['','Selecionar'],['paint','Pintar'],['erase','Apagar']]) {
+      const button = document.createElement('button');
+      button.className = 'btn';
+      button.textContent = caption;
+      button.onclick = () => { app.pieceMap.brushMode = mode; updateCalibrationPanel(); };
+      button.classList.toggle('active',(app.pieceMap.brushMode || '') === mode);
+      calibrationPanel.append(button);
+    }
+    for (const [name,key,min,max,value] of [['Pincel','brushRadius',1,64,8],['Opacidade','overlayPercent',0,100,100]]) {
+      const label = document.createElement('label'), input = document.createElement('input');
+      input.type='range'; input.min=min; input.max=max; input.value=app.pieceMap[key] ?? value;
+      input.oninput=()=>{app.pieceMap[key]=Number(input.value)};
+      label.append(name,input); calibrationPanel.append(label);
+    }
+    const isolated=document.createElement('label'), checkbox=document.createElement('input');
+    checkbox.type='checkbox'; checkbox.checked=Boolean(app.pieceMap.isolated);
+    checkbox.onchange=()=>{app.pieceMap.isolated=checkbox.checked};
+    isolated.append(checkbox,'Só a máscara selecionada'); calibrationPanel.append(isolated);
     calibrationPanel.classList.remove('hidden');
     return;
   }
@@ -2081,7 +2118,10 @@ function onPieceMapSelectionChange(region) {
   // Habilita/desabilita botão Gerar Peça
   const generateBtn = document.getElementById('btn-generate-piece');
   if (generateBtn) {
-    generateBtn.disabled = !region;
+    const reason = !region ? 'Selecione uma região.' : !app.pieceMap.generateMask(region.id) ? 'A máscara está vazia.' :
+      app.currentCharacterObject?.partManager?.getAllParts().some(p=>p.regionId===region.id) ? 'Esta região já tem uma peça.' : '';
+    generateBtn.disabled = Boolean(reason);
+    document.getElementById('piece-map-status').textContent = reason || region.name;
     if (!region) {
       generateBtn.title = 'Selecione uma região primeiro';
     } else {
@@ -2212,7 +2252,7 @@ function updatePieceMapPanel(selectedRegion) {
     </div>
   `;
   
-  propsForm.appendChild(panel);
+  document.querySelector('.panel-left .panel-content').appendChild(panel);
   
   // Event listeners para itens da lista
   panel.querySelectorAll('.region-list-item').forEach(item => {
@@ -2468,7 +2508,7 @@ function updateEditPartsPanel(selectedPart) {
     </div>
   `;
   
-  propsForm.appendChild(panel);
+  document.querySelector('.panel-left .panel-content').appendChild(panel);
   
   // Event listeners para itens da lista
   panel.querySelectorAll('.part-list-item').forEach(item => {
@@ -2622,6 +2662,16 @@ function updatePartPropertiesPanel(part) {
   const scaleXInput = document.getElementById('part-prop-scale-x');
   const scaleYInput = document.getElementById('part-prop-scale-y');
   const visibleInput = document.getElementById('part-prop-visible');
+  const jointBtn=document.createElement('button');
+  jointBtn.textContent='Pivô na articulação'; jointBtn.className='btn';
+  jointBtn.onclick=()=>{
+    const target=part.localTransform.inverseTransformPoint(0,0);
+    part.pivot.x+=target.x/part.imageWidth;
+    part.pivot.y+=target.y/part.imageHeight;
+    part.setLocalPosition(0,0);
+    updatePartPropertiesPanel(part);
+  };
+  panel.append(jointBtn);
   const resetBtn = document.getElementById('btn-reset-part-adjustments');
   const deleteBtn = document.getElementById('btn-delete-part');
   
@@ -2666,13 +2716,17 @@ function updatePartPropertiesPanel(part) {
   }
   if (scaleXInput) {
     scaleXInput.addEventListener('change', () => {
-      part.setLocalScale(parseFloat(scaleXInput.value), part.localScale.y);
+      const value=Number(scaleXInput.value);
+      if (value>0) part.setLocalScale(value,document.getElementById('lock-scale').checked ? part.localScale.y*value/part.localScale.x : part.localScale.y);
+      scaleYInput.value=part.localScale.y;
       app.renderer.render(app.scene);
     });
   }
   if (scaleYInput) {
     scaleYInput.addEventListener('change', () => {
-      part.setLocalScale(part.localScale.x, parseFloat(scaleYInput.value));
+      const value=Number(scaleYInput.value);
+      if (value>0) part.setLocalScale(document.getElementById('lock-scale').checked ? part.localScale.x*value/part.localScale.y : part.localScale.x,value);
+      scaleXInput.value=part.localScale.x;
       app.renderer.render(app.scene);
     });
   }
@@ -2687,7 +2741,7 @@ function updatePartPropertiesPanel(part) {
       part.setLocalPosition(0, 0);
       part.setLocalRotation(0);
       part.setLocalScale(1, 1);
-      part.pivot = { x: 0.5, y: 0.5 };
+      part.pivot = app.currentCharacterObject.pieceMap?.calculatePivot(part.regionId) || {x:0.5,y:0.5};
       updatePartPropertiesPanel(part);
       app.renderer.render(app.scene);
     });
@@ -2736,7 +2790,7 @@ function resetPartAdjustments() {
   part.setLocalPosition(0, 0);
   part.setLocalRotation(0);
   part.setLocalScale(1, 1);
-  part.pivot = { x: 0.5, y: 0.5 };
+  part.pivot = app.currentCharacterObject.pieceMap?.calculatePivot(part.regionId) || {x:0.5,y:0.5};
   
   updatePartPropertiesPanel(part);
   app.renderer.render(app.scene);
@@ -2807,6 +2861,8 @@ async function generatePieceFromMap() {
     }
     
     // Ajusta pivô para a articulação do cotovelo
+    part.regionId = region.id;
+    if (part.mask.type === "raster") part.mask.rows = structuredClone(part.mask.rows);
     part.pivot = pivot;
     // Atualiza a transformação local usando o método correto da classe Part
     part.updateLocalTransform();

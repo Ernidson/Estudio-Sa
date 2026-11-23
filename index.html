@@ -213,6 +213,7 @@
                 </svg>
                 <span>Mover</span>
               </button>
+              <button id="btn-rotate-part" class="btn">Rodar</button><button id="btn-scale-part" class="btn">Escala</button><label><input id="lock-scale" type="checkbox" checked> Proporcional</label>
               <button id="btn-edit-pivot" class="btn btn-secondary" title="Editar Pivô" disabled>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"></circle>
@@ -395,8 +396,6 @@
                 <div id="recognition-error" class="error-message hidden"></div>
               </div>
             </div>
-             </div>
-           </div>
            
            <!-- Painel do Calibrar Armadura -->
            <div id="calibration-panel" class="calibration-panel hidden">
@@ -413,7 +412,7 @@
           </div>
           
           <!-- Painel de propriedades normal -->
-          <div id="properties-form" class="properties-form hidden">
+          <details open id="properties-form" class="properties-form hidden"><summary>Propriedades</summary>
             <div class="form-group">
               <label for="prop-name">Nome</label>
               <input type="text" id="prop-name" readonly>
@@ -443,7 +442,7 @@
               </div>
             </div>
             <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformação</button>
-          </div>
+          </details>
           
           <!-- Painel de rigging (armadura) -->
           <div id="rigging-panel" class="rigging-panel hidden">

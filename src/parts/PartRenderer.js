@@ -57,6 +57,7 @@ export class PartRenderer {
     
     // Desenha cada peça na posição do seu bone
     for (const part of parts) {
+      part.selected = part.id === partManager.selectedPartId;
       this.drawPart(part, partManager.rig);
     }
     
@@ -109,6 +110,13 @@ export class PartRenderer {
   /**
    * Desenha indicador de seleção
    */
+  hitsRotationHandle(part,obj,x,y) {
+    const bone=obj.rig.getBone(part.boneId);
+    const m=this.renderer.viewport.clone().multiply(obj.transform).multiply(bone.worldTransform).multiply(part.localTransform);
+    const pt=m.transformPoint((.5-part.pivot.x)*part.imageWidth,-part.pivot.y*part.imageHeight-14);
+    return Math.hypot(pt.x-x,pt.y-y)<12;
+  }
+
   drawSelection(part) {
     const w = part.imageWidth;
     const h = part.imageHeight;
@@ -126,6 +134,10 @@ export class PartRenderer {
     this.ctx.stroke();
     this.ctx.setLineDash([]);
     
+    this.ctx.fillStyle='#fdc400';
+    for (const [x,y] of [[0,0],[w/2-pivotX,-pivotY-14]]) {
+      this.ctx.beginPath(); this.ctx.arc(x,y,5,0,2*Math.PI); this.ctx.fill();
+    }
     // Handles nos cantos
     const handleSize = 8;
     const corners = [

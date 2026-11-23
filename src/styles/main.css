@@ -698,7 +698,7 @@ body {
 }
 
 .piece-map-mode-active #no-selection,
-.piece-map-mode-active #properties-form,
+
 .piece-map-mode-active #rigging-panel {
   display: none;
 }
@@ -727,7 +727,7 @@ body {
 }
 
 .edit-parts-mode-active #no-selection,
-.edit-parts-mode-active #properties-form,
+
 .edit-parts-mode-active #rigging-panel,
 .edit-parts-mode-active #piece-map-toolbar,
 .edit-parts-mode-active #test-movement-controls {
@@ -1279,3 +1279,15 @@ body {
   padding: 4px 8px;
   font-size: 11px;
 }
+.app-container > .main-area { display:grid; grid-template-columns:clamp(160px,17vw,250px) minmax(0,1fr) clamp(280px,22vw,340px); grid-template-rows:minmax(0,1fr); min-height:0 }
+.main-area > .panel, .main-area > .canvas-area {width:auto;min-width:0;min-height:0}
+.main-area > .panel > .panel-content {min-height:0;overflow:auto;overscroll-behavior:contain}
+.main-area .canvas-container {min-height:0;min-width:0}
+.panel-right .toolbar-group .btn {min-width:0;padding:5px}
+.panel-right .piece-map-toolbar {background:var(--bg-tertiary);top:-8px}
+.panel-right summary {cursor:pointer}
+@media(max-width:760px){.app-container > .main-area{grid-template-columns:minmax(80px,17%) minmax(0,1fr) minmax(140px,32%)}.top-bar{overflow-x:auto}}
+
+.main-area:not(:has(#piece-map-toolbar:not(.hidden))) #piece-map-panel,
+.main-area:not(:has(#edit-parts-toolbar:not(.hidden))) .panel-left #edit-parts-panel {display:none}
+.panel-left .region-list-item {flex-wrap:wrap}

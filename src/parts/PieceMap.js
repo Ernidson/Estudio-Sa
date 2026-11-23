@@ -721,7 +721,8 @@ export class PieceMap {
     );
 
     for (const region of this.regions.values()) {
-      if (!region.visible) continue;
+      if ((!region.visible && !region.raster) || (this.isolated && region.id!==this.selectedRegionId)) continue;
+      ctx.globalAlpha=(this.overlayPercent ?? 100)/100;
       this.drawRegion(ctx, region);
     }
 
