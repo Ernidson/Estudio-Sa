@@ -49,3 +49,5 @@
 - [Editor de peças, pivô e cadeia do braço](2026-11-23_cadeia_braco.md)
 
 - [Fase 2D.6 A — geração em lote e reabertura](2026-11-23_2D6_A.md)
+
+- [2D.7 A — preparação da cena](2026-11-23_2D7_A.md)

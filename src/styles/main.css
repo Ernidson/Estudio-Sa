@@ -1307,3 +1307,4 @@ body {
 #animation-editor button {white-space:normal;padding:4px 6px}
 #animation-editor input[name=cursor] {display:block}
 #animation-editor label:has(input[name=cursor]) {display:block}
+#pullup-station label {display:inline-block;margin:3px} #pullup-station input[type=number]{width:6em} #pullup-station input[type=file]{max-width:100%}

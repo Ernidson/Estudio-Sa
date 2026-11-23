@@ -1,3 +1,4 @@
+import {setupStation} from './pullup/Station.js';
 import {timelineEditor} from './animation/Timeline.js';
 import {generateBatch, undoBatch, hasBatch} from './parts/BatchParts.js';
 import { refreshTextures } from './parts/RasterPieces.js';
@@ -397,6 +398,7 @@ function setupEventListeners() {
   
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  app.station = setupStation(document.querySelector("#pullup-station"),()=>app.currentCharacterObject,()=>app.scene,()=>{updateLayersPanel();app.renderer.fitToObjects(app.scene.getVisibleObjects());});
   app.timeline = timelineEditor(document.getElementById('animation-editor'), () => updateEditPartsPanel());
   const target = document.getElementById('edit-target');
   document.getElementById('joint-patches').onchange = event => {
@@ -2404,6 +2406,7 @@ function enterEditPartsMode() {
   app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   
   // Atualiza UI
+  app.station.refresh();
   app.timeline.select(obj);
   document.getElementById('joint-patches').checked = obj.armJointPatches !== false;
   document.getElementById('edit-target').value = 'part';

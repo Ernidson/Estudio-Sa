@@ -10,6 +10,7 @@ import { PieceMap } from '../parts/PieceMap.js';
 
 export class SceneObject {
   constructor(data = {}) {
+    this.pullup = data.pullup ?? null;
     this.animation = data.animation ?? null;
     this.armJointPatches = data.armJointPatches !== false;
     this.id = data.id || generateId();
@@ -123,6 +124,7 @@ export class SceneObject {
       imageData: this.imageData,
       imageWidth: this.imageWidth,
       imageHeight: this.imageHeight,
+      ...(this.pullup && {pullup:this.pullup}),
       ...(this.animation && {animation:this.animation}),
       armJointPatches: this.armJointPatches,
       transform: this.transform.toJSON(),
