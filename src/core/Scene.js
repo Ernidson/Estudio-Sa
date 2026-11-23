@@ -10,6 +10,7 @@ import { PieceMap } from '../parts/PieceMap.js';
 
 export class SceneObject {
   constructor(data = {}) {
+    this.armJointPatches = data.armJointPatches !== false;
     this.id = data.id || generateId();
     this.name = data.name || 'Objeto';
     this.type = data.type || 'image';
@@ -121,6 +122,7 @@ export class SceneObject {
       imageData: this.imageData,
       imageWidth: this.imageWidth,
       imageHeight: this.imageHeight,
+      armJointPatches: this.armJointPatches,
       transform: this.transform.toJSON(),
       layerOrder: this.layerOrder,
       rig: this.rig ? this.rig.toJSON() : null,

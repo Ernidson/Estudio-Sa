@@ -396,6 +396,9 @@ function setupEventListeners() {
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
   const target = document.getElementById('edit-target');
+  document.getElementById('joint-patches').onchange = event => {
+    app.currentCharacterObject.armJointPatches = event.target.checked;
+  };
   target.onchange = () => updateEditPartsPanel();
   document.getElementById('joint-angle').oninput = event => {
     const part = app.partManager?.getSelectedPart();
@@ -2398,6 +2401,7 @@ function enterEditPartsMode() {
   app.partManager.setReferences(app.renderer.rigRenderer, app.renderer);
   
   // Atualiza UI
+  document.getElementById('joint-patches').checked = obj.armJointPatches !== false;
   document.getElementById('edit-target').value = 'part';
   app.editPartsSelectedPartId = app.partManager.getSelectedPart()?.id ?? null;
   updateEditPartsModeUI(true);

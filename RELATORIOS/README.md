@@ -9,6 +9,7 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-23 | Uniões do braço esquerdo | Comparação de texturas em quatro ângulos | Protótipo | [Relatório](2026-11-23_2D6_B.md) | PR #1 |
 | 2026-11-23 | Interface do editor | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_interface_editor.md) | PR #1 |
 | 2026-11-23 | Edição de peças raster | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_edicao_pecas_raster.md) | PR #1 |
 | 2026-11-23 | Rigging e persistência | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_rigging_persistencia.md) | PR #1 |

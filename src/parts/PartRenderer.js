@@ -1,3 +1,4 @@
+import {drawArmJoints} from './ArmJointPatch.js';
 /**
  * PartRenderer - Renderiza peças recortadas sobre o personagem
  */
@@ -55,6 +56,8 @@ export class PartRenderer {
       combined.m[4], combined.m[5]
     );
     
+    if (characterObject.armJointPatches !== false) drawArmJoints(this.ctx, parts, partManager.rig);
+
     // Desenha cada peça na posição do seu bone
     for (const part of parts) {
       part.selected = part.id === partManager.selectedPartId;
