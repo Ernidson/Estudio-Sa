@@ -1,3 +1,4 @@
+import {createPullupClip,resizeLift} from '../pullup/PullupClip.js';
 import {capturePose,applyPose,samplePose} from './PoseClip.js';
 
 export function timelineEditor(panel, refresh) {
@@ -51,6 +52,9 @@ export function timelineEditor(panel, refresh) {
   }
   function sync() {
     const data=obj.animation ?? {duration:3,fps:30,keys:[]};
+    field('exercise').hidden=!obj.pullup;
+    field('height').value=obj.pullup?.height ?? 280;
+    field('rate').value=data.rate ?? 1;
     field('duration').value=data.duration;
     field('fps').value=data.fps;
     field('cursor').max=data.duration;
@@ -69,6 +73,7 @@ export function timelineEditor(panel, refresh) {
     const elbow=obj.rig.getBone('cotovelo_esquerdo');
     if (!elbow || (clip().keys.length && !confirm('Substituir os keyframes pela demonstração?'))) return;
     const data=clip();
+    delete data.exercise;
     data.duration=3;
     data.keys=[];
     const angle=elbow.getLocalRotation();
@@ -85,10 +90,11 @@ export function timelineEditor(panel, refresh) {
   panel.onclick=event=>{
     const action=event.target.closest('button')?.value;
     if (!action || !obj) return;
+    if (action==='pullup' && !obj.pullup)return;
     if (action==='play') {
       if (!clip().keys.length || started!==null) return;
       if (time>=clip().duration) seek(0);
-      started=performance.now()-time*1000;
+      started=performance.now()-time*1000/(clip().rate ?? 1);
       return;
     }
     pause();
@@ -100,6 +106,12 @@ export function timelineEditor(panel, refresh) {
       case 'copy': clipboard=capturePose(obj); break;
       case 'paste': if (clipboard) applyPose(obj,clipboard); break;
       case 'reset': applyPose(obj,clip().initial); break;
+      case 'pullup':
+        if (!obj.animation?.keys.length || confirm('Substituir os keyframes pela barra fixa?')) {
+          obj.animation=createPullupClip(obj,obj.pullup.height,5,obj.animation?.fps ?? 30);
+          seek(0);
+        }
+        break;
       case 'demo': demo(); break;
     }
     sync();
@@ -108,8 +120,29 @@ export function timelineEditor(panel, refresh) {
   field('duration').onchange=e=>{
     pause();
     const value=e.target.valueAsNumber;
-    if (Number.isFinite(value) && value>=Math.max(0.1,clip().keys.at(-1)?.time ?? 0)) clip().duration=value;
+    if(clip().exercise==='pullup' && Number.isFinite(value) && value>=.1){
+      const ratio=value/clip().duration;
+      for(const key of clip().keys)key.time*=ratio;
+      time*=ratio;clip().duration=value;
+    }
+    else if (Number.isFinite(value) && value>=Math.max(0.1,clip().keys.at(-1)?.time ?? 0)) clip().duration=value;
     seek(time);sync();refresh();
+  };
+  field('height').onchange=e=>{
+    pause();
+    const h=e.target.valueAsNumber;
+    if(obj.pullup && Number.isFinite(h) && h>=1){resizeLift(obj,h);seek(time);}
+    sync();
+  };
+  field('rate').onchange=e=>{
+    pause();
+    const value=e.target.valueAsNumber;
+    if(Number.isFinite(value) && value>=.1 && value<=4)clip().rate=value;
+    sync();
+  };
+  field('curve').onchange=e=>{
+    const key=obj.animation?.keys.find(k=>Math.abs(k.time-time)<1e-6);
+    if(key){key.curve=e.target.value;sync();}
   };
   field('fps').onchange=e=>{pause();clip().fps=Number(e.target.value);sync();};
   field('keys').onchange=e=>{if(e.target.value!==''){pause();seek(Number(e.target.value));refresh();}};
@@ -124,7 +157,7 @@ export function timelineEditor(panel, refresh) {
     },
     tick(now) {
       if(started===null || !obj) return;
-      const data=clip(), elapsed=(now-started)/1000;
+      const data=clip(), elapsed=(now-started)/1000*(data.rate ?? 1);
       if(elapsed>=data.duration && !field('loop').checked) {
         seek(data.duration);pause();refresh();return;
       }

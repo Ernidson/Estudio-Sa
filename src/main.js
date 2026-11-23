@@ -407,7 +407,7 @@ function setupEventListeners() {
   // Editor de Peças (Fase 2B.3)
   document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
   app.corrections = correctiveEditor(document.querySelector("#pose-corrections"),()=>app.currentCharacterObject);
-  app.station = setupStation(document.querySelector("#pullup-station"),()=>app.currentCharacterObject,()=>app.scene,()=>{updateLayersPanel();app.renderer.fitToObjects(app.scene.getVisibleObjects());});
+  app.station = setupStation(document.querySelector("#pullup-station"),()=>app.currentCharacterObject,()=>app.scene,()=>{updateLayersPanel();app.timeline.select(app.currentCharacterObject);app.renderer.fitToObjects(app.scene.getVisibleObjects());});
   app.timeline = timelineEditor(document.getElementById('animation-editor'), () => updateEditPartsPanel());
   const target = document.getElementById('edit-target');
   document.getElementById('joint-patches').onchange = event => {
