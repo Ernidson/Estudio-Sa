@@ -68,9 +68,15 @@ export function correctiveEditor(panel,getCharacter) {
     f('patch').selectedIndex=index;
     const p=list[index];
     f('correct').checked=obj?.pullup?.correct!==false;
+    f('local-mesh').checked=!!obj?.pullup?.localMesh;
     if(p)for(const n of ['x','y','scale','radius','start','peak','end','softness'])f(n).value=p[n];
     return p;
   }
+  f('local-mesh').onchange = e => {
+    const obj=getCharacter();
+    if(obj?.pullup) obj.pullup.localMesh=e.target.checked;
+    else {e.target.checked=false;f('tip').textContent='Associa primeiro a barra e cria uma animação com pose inicial.';}
+  };
   f('source').onchange=async e=>{
     if(!e.target.files[0])return;
     source=(await readPNG(e.target.files[0])).image;points=[];

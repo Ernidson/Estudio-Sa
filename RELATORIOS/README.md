@@ -9,6 +9,7 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-24 | Protótipo de malha local | Campo de rotação no braço esquerdo; comparação visual e limitações | Experimental, desligado por defeito | [Relatório](2026-11-24_prototipo_malha_local.md) | commit desta atualização |
 | 2026-11-24 | Contactos e navegação | Fixação independente do modo, contacto raster ajustável, diagnóstico e cinco modos permanentes | Testado; estética pendente | [Relatório](2026-11-24_contactos_e_navegacao.md) | commit desta atualização |
 | 2026-11-24 | Diagnóstico estrutural | Comparação de três arquiteturas e gravação | Causas reproduzidas | [Relatório](2026-11-24_diagnostico_estrutural.md) | PR #1 |
 | 2026-11-23 | Validação da barra fixa | Fase 2D.7 E | Testado em Chromium | [Relatório](2026-11-23_2D7_E.md) | PR #1 |

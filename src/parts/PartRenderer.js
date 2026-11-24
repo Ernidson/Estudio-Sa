@@ -1,3 +1,4 @@
+import {drawLocalJointMeshes} from './LocalJointMesh.js';
 import {drawCorrectives,elevation} from '../pullup/Correctives.js';
 import {drawArmJoints} from './ArmJointPatch.js';
 /**
@@ -67,6 +68,8 @@ export class PartRenderer {
     );
     
     if (characterObject.armJointPatches !== false) drawArmJoints(this.ctx, parts, partManager.rig);
+
+    this.meshStats = drawLocalJointMeshes(this.ctx,characterObject);
 
     // Desenha cada peça na posição do seu bone
     for (const part of parts) {

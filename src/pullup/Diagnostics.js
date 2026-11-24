@@ -40,8 +40,27 @@ export function drawArmDiagnostic(ctx, viewport, sample, label) {
     const radius = name === 'target' ? 10 : 4;
     ctx.arc(p.x,p.y,radius,0,Math.PI*2);
     ctx.stroke();
-    ctx.fillText(`${label} ${name} ${sample[name].x.toFixed(1)},${sample[name].y.toFixed(1)}`,
+    const names={shoulder:'ombro',elbow:'cotovelo',wrist:'punho',drawn:'textura',target:'alvo'};
+    ctx.fillText(`${label} ${names[name]} ${sample[name].x.toFixed(1)},${sample[name].y.toFixed(1)}`,
       p.x+13, p.y+(name === 'drawn' ? 16 : -8));
   }
   ctx.restore();
+}
+
+const rails = new WeakMap();
+export function railCenter(bar) {
+  if (!bar.imageElement) return null;
+  if (rails.has(bar.imageElement)) return rails.get(bar.imageElement);
+  const canvas=document.createElement('canvas');
+  canvas.width=1;canvas.height=bar.imageHeight;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(bar.imageElement,-Math.floor(bar.imageWidth/2),0);
+  const rgba=ctx.getImageData(0,0,1,canvas.height).data;
+  let first=0;
+  while(first<canvas.height && rgba[first*4+3]<128)first++;
+  let last=first;
+  while(last<canvas.height && rgba[last*4+3]>=128)last++;
+  const result=first===canvas.height ? null : (first+last)/2-canvas.height/2;
+  rails.set(bar.imageElement,result);
+  return result;
 }

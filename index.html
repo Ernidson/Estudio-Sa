@@ -207,6 +207,8 @@
               <label><input name="fixed" type="checkbox"> Fixar as duas mãos</label>
               <label>Barra X <input name="barX" type="number" step="any"></label><label>Barra Y <input name="barY" type="number" step="any"></label><label>Escala <input name="size" type="number" step="any"></label><label>Pega E · X <input name="x0" type="number" step="any"></label><label>Y <input name="y0" type="number" step="any"></label><label>Pega D · X <input name="x1" type="number" step="any"></label><label>Y <input name="y1" type="number" step="any"></label></div></details>
             <details id="pose-corrections"><summary>Correções por pose</summary>
+<label><input name="local-mesh" type="checkbox"> Protótipo de malha local · braço esquerdo</label>
+<p>Experimental: preenchimento localizado no ombro e cotovelo. Desliga para comparar; não corrige todas as costuras.</p>
             <label><input name="correct" type="checkbox"> Ativar correções</label>
             <label>Referência PNG <input type="file" name="source" accept="image/png"></label>
             <canvas name="preview" hidden style="width:100%;height:auto"></canvas>

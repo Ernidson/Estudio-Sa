@@ -18,6 +18,7 @@ with sync_playwright() as pw, TemporaryDirectory() as tmp:
     page = browser.new_page(viewport={"width": 1440, "height": 1000})
     page.set_default_timeout(9000)
     page.on("pageerror", lambda exc: errors.append(str(exc)))
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
     page.on("dialog", lambda d: d.accept())
     page.add_init_script("delete window.showSaveFilePicker; delete window.showOpenFilePicker")
     # Serve the actual production assets in-process, without a second HTTP server.
@@ -91,5 +92,14 @@ with sync_playwright() as pw, TemporaryDirectory() as tmp:
     chooser.value.set_files(saved)
     page.wait_for_function('app.isEditPartsMode && app.currentCharacterObject?.pullup?.contacts[0].uv')
     assert page.evaluate('app.currentCharacterObject.pullup.contacts[0].uv')==uv
+    # Exercise the actual PNG import control using the original image embedded in the private project.
+    import base64
+    image=page.evaluate('app.currentCharacterObject.imageData')
+    png=Path(tmp)/'original.png';png.write_bytes(base64.b64decode(image.split(',',1)[1]))
+    before=page.evaluate('app.scene.objects.length')
+    with page.expect_file_chooser() as chooser:
+        page.click('#btn-import-png')
+    chooser.value.set_files(png)
+    page.wait_for_function(f'app.scene.objects.length === {before+1}')
     assert not errors,errors
     print({'contact_drift_all_modes':sample,'viewports':3,'transitions':15,'roundtrip':'passed','errors':errors})

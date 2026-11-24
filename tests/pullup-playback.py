@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 parser = argparse.ArgumentParser()
 parser.add_argument("project", type=Path)
 parser.add_argument("--chromium")
+parser.add_argument("--local-mesh", action="store_true")
 parser.add_argument("--capture", type=Path, required=True)
 args = parser.parse_args()
 args.capture.mkdir(parents=True, exist_ok=True)
@@ -35,6 +36,8 @@ with sync_playwright() as pw, TemporaryDirectory() as tmp:
         page.click("#btn-open-project")
     chooser.value.set_files(args.project)
     page.wait_for_function("app.isEditPartsMode")
+    if args.local_mesh:
+        page.evaluate('app.currentCharacterObject.pullup.localMesh=true')
     panel=page.locator("#animation-editor")
     panel.locator(":scope > summary").click()
     def action(v):

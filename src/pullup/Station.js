@@ -1,4 +1,4 @@
-import {contactUV, measureArm, drawArmDiagnostic} from './Diagnostics.js';
+import {contactUV, measureArm, drawArmDiagnostic, railCenter} from './Diagnostics.js';
 import {SceneObject} from '../core/Scene.js';
 
 export const sides=['esquerdo','direito'];
@@ -112,6 +112,16 @@ export function setupStation(panel,getCharacter,getScene,updated) {
       : 'Fixação desligada';
     if(field('status').textContent !== status)field('status').textContent=status;
     if(field('diagnostic').checked) {
+      const rail=railCenter(structure);
+      if(rail!==null) {
+        const matrix=viewport.clone().multiply(structure.transform);
+        const xs=obj.pullup.grips.map(g=>g.x);
+        const a=matrix.transformPoint(Math.min(...xs)-50,rail);
+        const b=matrix.transformPoint(Math.max(...xs)+50,rail);
+        ctx.save();ctx.strokeStyle='#5ce8ff';ctx.fillStyle='#5ce8ff';ctx.setLineDash([6,4]);
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        ctx.fillText('Travessão · centro da faixa opaca',a.x,a.y-24);ctx.restore();
+      }
       samples.forEach((sample,i)=>drawArmDiagnostic(ctx,viewport,sample,i?'D':'E'));
       const text=samples.map((s,i)=>s ? `${i?'D':'E'} · flexão ${s.flexion.toFixed(1)}° · contacto ${s.error.toFixed(2)} px` : 'Mão não disponível').join('\n');
       if(field('measurements').textContent!==text)field('measurements').textContent=text;
