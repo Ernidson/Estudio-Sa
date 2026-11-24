@@ -1,3 +1,4 @@
+import { rasterBounds, rasterContains, rasterPath } from '../segmentation/RasterRegion.js';
 /**
  * PieceMap - Mapa de Pecas automatico baseado na armadura
  * Gera regioes coloridas para cada parte do corpo a partir dos ossos
@@ -302,8 +303,6 @@ export class PieceMap {
 
     const bones = this.rig.getAllBones();
 
-    const charInv = this.characterObject.transform.getInverse();
-
     for (const bone of bones) {
       const child = bone.children[0];
 
@@ -327,7 +326,7 @@ export class PieceMap {
 
       if (!points || points.length < 3) continue;
 
-      const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+      const localPoints = points;
 
       const color = REGION_COLORS[bone.id] || this.getRandomColor();
       const name = REGION_NAMES_PT[bone.id] || bone.name;
@@ -349,7 +348,7 @@ export class PieceMap {
     if (headBone && headBone.worldTransform) {
       const points = generateHeadRegion(headBone, this.characterObject.imageHeight, this.characterObject.imageWidth);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('cabeca_anatomica', {
           id: 'cabeca_anatomica',
           boneId: 'cabeca',
@@ -370,7 +369,7 @@ export class PieceMap {
     if (neckBone && neckBone.worldTransform && headBone2 && headBone2.worldTransform) {
       const points = generateNeckRegion(neckBone, headBone2);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('pescoco_anatomico', {
           id: 'pescoco_anatomico',
           boneId: 'pescoco',
@@ -390,7 +389,7 @@ export class PieceMap {
     if (leftWristBone && leftWristBone.worldTransform) {
       const points = generateHandRegion(leftWristBone, true);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('mao_esquerda', {
           id: 'mao_esquerda',
           boneId: 'pulso_esquerdo',
@@ -410,7 +409,7 @@ export class PieceMap {
     if (rightWristBone && rightWristBone.worldTransform) {
       const points = generateHandRegion(rightWristBone, false);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('mao_direita', {
           id: 'mao_direita',
           boneId: 'pulso_direito',
@@ -430,7 +429,7 @@ export class PieceMap {
     if (leftAnkleBone && leftAnkleBone.worldTransform) {
       const points = generateFootRegion(leftAnkleBone, true);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('pe_esquerdo', {
           id: 'pe_esquerdo',
           boneId: 'tornozelo_esquerdo',
@@ -450,7 +449,7 @@ export class PieceMap {
     if (rightAnkleBone && rightAnkleBone.worldTransform) {
       const points = generateFootRegion(rightAnkleBone, false);
       if (points && points.length >= 3) {
-        const localPoints = points.map(p => charInv.transformPoint(p.x, p.y));
+        const localPoints = points;
         this.regions.set('pe_direito', {
           id: 'pe_direito',
           boneId: 'tornozelo_direito',
@@ -516,7 +515,8 @@ export class PieceMap {
 
     for (const region of regionArray) {
       if (!region.visible) continue;
-      if (this.pointInPolygon(localPos.x, localPos.y, region.points)) {
+      if (region.raster ? rasterContains(region.raster, localPos.x + this.characterObject.imageWidth / 2,
+        localPos.y + this.characterObject.imageHeight / 2) : this.pointInPolygon(localPos.x, localPos.y, region.points)) {
         return region.id;
       }
     }
@@ -538,7 +538,7 @@ export class PieceMap {
     if (!this.selectedRegionId) return null;
 
     const region = this.regions.get(this.selectedRegionId);
-    if (!region) return null;
+    if (!region || region.raster) return null;
 
     const localPos = this.screenToCharacterLocal(screenX, screenY);
     const threshold = this.controlPointRadius / this.renderer.viewportScale;
@@ -639,6 +639,11 @@ export class PieceMap {
     const region = this.regions.get(regionId);
     if (!region) return null;
 
+    if (region.raster) {
+      const bounds = rasterBounds(region.raster);
+      return bounds ? { ...region.raster, bounds } : null;
+    }
+
     const imgCenterX = this.characterObject.imageWidth / 2;
     const imgCenterY = this.characterObject.imageHeight / 2;
 
@@ -681,44 +686,11 @@ export class PieceMap {
     const mask = this.generateMask(regionId);
     if (!mask) return { x: 0.5, y: 0.5 };
 
-    // 1. Centro da peça em coordenadas da imagem
-    const pieceCenterImgX = mask.bounds.x + mask.bounds.width / 2;
-    const pieceCenterImgY = mask.bounds.y + mask.bounds.height / 2;
-
-    // 2. Centro da peça em coordenadas locais do personagem
-    const pieceCenterCharX = pieceCenterImgX - imgCenterX;
-    const pieceCenterCharY = pieceCenterImgY - imgCenterY;
-
-    // 2. Converte para coordenadas mundiais
-    const charTransform = this.characterObject.transform;
-    const rigBaseTransform = this.rig?.baseTransform || createTransform();
-    const charRigTransform = new Transform2D();
-    charRigTransform.multiply(charTransform);
-    charRigTransform.multiply(rigBaseTransform);
-    const pieceCenterWorld = charRigTransform.transformPoint(pieceCenterCharX, pieceCenterCharY);
-
-    // 4. Posição da articulação em coordenadas mundiais
-    const jointWorld = bone.getWorldPoint();
-
-    // Converte a posição da articulação para coordenadas da imagem
-    const charRigInv = charRigTransform.getInverse();
-    const jointChar = charRigInv.transformPoint(jointWorld.x, jointWorld.y);
-    const jointImgX = jointChar.x + imgCenterX;
-    const jointImgY = jointChar.y + imgCenterY;
-
-    // Calcula pivot na textura da peça (coordenadas 0-1)
-    const texWidth = mask.bounds.width + 4;  // bounds.width + 2*margin
-    const texHeight = mask.bounds.height + 4; // bounds.height + 2*margin
-    
-    // Posição da articulação na textura (pixels a partir do canto superior esquerdo da textura)
-    const jointTexX = jointImgX - mask.bounds.x + 2; // +margin
-    const jointTexY = jointImgY - mask.bounds.y + 2; // +margin
-    
-    // Pivot em coordenadas normalizadas (0-1)
-    const pivotX = jointTexX / texWidth;
-    const pivotY = jointTexY / texHeight;
-
-    return { x: Math.max(0, Math.min(1, pivotX)), y: Math.max(0, Math.min(1, pivotY)) };
+    const joint = bone.getWorldPoint();
+    return {
+      x: (joint.x + imgCenterX - mask.bounds.x + 2) / (Math.floor(mask.bounds.width + 4)),
+      y: (joint.y + imgCenterY - mask.bounds.y + 2) / (Math.floor(mask.bounds.height + 4)),
+    };
   }
 
   /**
@@ -749,7 +721,8 @@ export class PieceMap {
     );
 
     for (const region of this.regions.values()) {
-      if (!region.visible) continue;
+      if (!region.visible || (this.isolated && region.id!==this.selectedRegionId)) continue;
+      ctx.globalAlpha=(this.overlayPercent ?? 100)/100;
       this.drawRegion(ctx, region);
     }
 
@@ -760,6 +733,14 @@ export class PieceMap {
    * Desenha uma regiao individual
    */
   drawRegion(ctx, region) {
+    if (region.raster) {
+      ctx.save();
+      ctx.translate(-this.characterObject.imageWidth / 2, -this.characterObject.imageHeight / 2);
+      ctx.fillStyle = region.selected ? 'rgba(255,204,0,0.7)' : region.color;
+      ctx.fill(rasterPath(region.raster));
+      ctx.restore();
+      return;
+    }
     if (region.points.length < 3) return;
 
     ctx.save();
@@ -824,6 +805,7 @@ export class PieceMap {
     const regionsData = {};
     for (const [id, region] of this.regions) {
       regionsData[id] = {
+        raster: region.raster,
         boneId: region.boneId,
         points: region.points,
         originalPoints: region.originalPoints || region.points,
@@ -848,6 +830,7 @@ export class PieceMap {
       for (const [id, regionData] of Object.entries(data.regions)) {
         map.regions.set(id, {
           id,
+          raster: regionData.raster,
           boneId: regionData.boneId,
           points: regionData.points.map(p => ({ x: p.x, y: p.y })),
           originalPoints: (regionData.originalPoints || regionData.points).map(p => ({ x: p.x, y: p.y })),

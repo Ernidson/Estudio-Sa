@@ -46,15 +46,7 @@
           </svg>
           Importar PNG
         </button>
-        <button id="btn-prepare-character" class="btn" title="Preparar Personagem (Criar Armadura)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          Preparar Personagem
-        </button>
+
         <button id="btn-cut-piece" class="btn" title="Recortar Peça" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6.5 6.5h11v11h-11z"></path>
@@ -66,33 +58,9 @@
           </svg>
           Recortar Peça
         </button>
-        <button id="btn-piece-map" class="btn" title="Mapa de Peças" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
-          </svg>
-          Mapa de Peças
-        </button>
-        <button id="btn-edit-parts" class="btn" title="Editar Peças" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5a2.121 2.121 0 0 1 3 3z"></path>
-          </svg>
-          Editar Peças
-        </button>
-        <button id="btn-calibrate-armor" class="btn" title="Calibrar Armadura" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="2" x2="12" y2="6"></line>
-            <line x1="12" y1="18" x2="12" y2="22"></line>
-            <line x1="2" y1="12" x2="6" y2="12"></line>
-            <line x1="18" y1="12" x2="22" y2="12"></line>
-            <path d="M12 12l4 0"></path>
-          </svg>
-          Calibrar Armadura
-        </button>
+
+
+
         <button id="btn-exit-rigging" class="btn" title="Sair Modo Armadura" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -102,7 +70,39 @@
         </button>
         <input type="file" id="file-import-png" accept="image/png" style="position: absolute; left: -9999px; opacity: 0; pointer-events: none;">
       </div>
-    </header>
+    </header><nav id="mode-navigation" aria-label="Modos da personagem"><button id="btn-prepare-character" class="btn" data-mode="prepare" title="Preparar Personagem (Criar Armadura)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Preparar Personagem
+        </button><button id="btn-calibrate-armor" class="btn" data-mode="calibrate" title="Calibrar Armadura" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="2" x2="12" y2="6"></line>
+            <line x1="12" y1="18" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="6" y2="12"></line>
+            <line x1="18" y1="12" x2="22" y2="12"></line>
+            <path d="M12 12l4 0"></path>
+          </svg>
+          Calibrar Armadura
+        </button><button id="btn-piece-map" class="btn" data-mode="map" title="Mapa de Peças" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          Mapa de Peças
+        </button><button id="btn-edit-parts" class="btn" data-mode="edit" title="Editar Peças" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5a2.121 2.121 0 0 1 3 3z"></path>
+          </svg>
+          Editar Peças
+        </button><button class="btn" id="btn-animation-mode" data-mode="animation">Animação</button><output id="mode-message" aria-live="polite"></output></nav>
 
     <!-- Área principal -->
     <main class="main-area">
@@ -136,6 +136,8 @@
           
           <!-- Barra fixa do Mapa de Peças (sempre visível no modo Mapa de Peças) -->
           <div id="piece-map-toolbar" class="piece-map-toolbar hidden">
+            <div><button class="btn" id="generate-all">Gerar Todas as Peças</button><button class="btn" id="undo-batch" disabled>Desfazer lote</button></div>
+            <output id="batch-report" style="white-space:pre-line;max-height:6em;overflow:auto" aria-live="polite"></output>
             <div class="toolbar-group">
               <button id="btn-preview-piece" class="btn btn-secondary" title="Pré-visualizar Peça">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -193,6 +195,52 @@
           
           <!-- Barra fixa do Editor de Peças (sempre visível no modo Editar Peças) -->
           <div id="edit-parts-toolbar" class="edit-parts-toolbar hidden">
+            <details id="pullup-station"><summary>Barra fixa</summary>
+              <label>Estrutura PNG <input name="structure" type="file" accept="image/png"></label>
+              <output name="association"></output><output name="status"></output>
+<label><input name="diagnostic" type="checkbox"> Diagnóstico visual</label>
+<output name="measurements"></output>
+              <div name="settings" hidden>
+<label>Contacto na textura <select name="hand"><option value="0">Mão esquerda</option><option value="1">Mão direita</option></select></label>
+<p>Clica no ponto da mão que deve tocar na barra. Verde: contacto; amarelo: alvo; rosa: punho. Coordenadas em píxeis da cena.</p>
+<canvas name="hand-preview" width="240" height="140" style="width:100%;max-width:240px;background:#30343d"></canvas><label><input name="locked" type="checkbox"> Bloquear estrutura</label>
+              <label><input name="fixed" type="checkbox"> Fixar as duas mãos</label>
+              <label>Barra X <input name="barX" type="number" step="any"></label><label>Barra Y <input name="barY" type="number" step="any"></label><label>Escala <input name="size" type="number" step="any"></label><label>Pega E · X <input name="x0" type="number" step="any"></label><label>Y <input name="y0" type="number" step="any"></label><label>Pega D · X <input name="x1" type="number" step="any"></label><label>Y <input name="y1" type="number" step="any"></label></div></details>
+            <details id="pose-corrections"><summary>Correções por pose</summary>
+<label><input name="local-mesh" type="checkbox"> Protótipo de malha local · braço esquerdo</label>
+<p>Experimental: preenchimento localizado no ombro e cotovelo. Desliga para comparar; não corrige todas as costuras.</p>
+            <label><input name="correct" type="checkbox"> Ativar correções</label>
+            <label>Referência PNG <input type="file" name="source" accept="image/png"></label>
+            <canvas name="preview" hidden style="width:100%;height:auto"></canvas>
+            <select name="bone" aria-label="Articulação da referência"><option>ombro_esquerdo</option><option>ombro_direito</option><option>cotovelo_esquerdo</option><option>cotovelo_direito</option><option>peito</option></select>
+            <button class="btn" name="add">Criar região</button><output name="tip"></output>
+            <select name="patch" aria-label="Região corretiva"></select>
+            <label>X <input type="number" name="x" step="any"></label><label>Y <input type="number" name="y" step="any"></label><label>Escala <input type="number" name="scale" step="any"></label><label>Raio da máscara <input type="number" name="radius" step="any"></label><label>Suavidade <input type="number" name="softness" step="any"></label><label>Entrada <input type="number" name="start" step="any"></label><label>Pico <input type="number" name="peak" step="any"></label><label>Saída <input type="number" name="end" step="any"></label><button class="btn" name="remove">Eliminar região</button></details>
+            <details id="animation-editor"><summary>Animação</summary>
+              <div name="exercise" hidden>
+              <button class="btn" value="pullup">Criar animação de barra fixa</button>
+              <label>Altura (px) <input name="height" type="number" min="1" step="1"></label>
+              <label>Velocidade × <input name="rate" type="number" min="0.1" max="4" step="0.1"></label>
+              </div>
+              <label>Tempo <output name="seconds">0.00 s</output><datalist id="animation-ticks"></datalist><input list="animation-ticks" type="range" name="cursor" min="0" max="3" value="0" step="0.033333"></label>
+              <div><button class="btn" value="play">Reproduzir</button><button class="btn" value="pause">Pausar</button><button class="btn" value="stop">Parar</button><button class="btn" value="start">Início</button></div>
+              <label><input name="loop" type="checkbox"> Repetir</label>
+              <label>Duração (s) <input name="duration" type="number" min="0.1" step="0.1"></label>
+              <label>FPS <select name="fps"><option>24</option><option>30</option></select></label>
+              <select aria-label="Keyframes" name="keys"></select>
+              <details><summary>Transformação do osso</summary>
+                <select name="bone" aria-label="Osso a animar"></select>
+                <label>X <input type="number" name="x" step="0.1"></label><label>Y <input type="number" name="y" step="0.1"></label><label>Rotação (°) <input type="number" name="rotation" step="1"></label><label>Escala X <input type="number" name="scaleX" step="0.01"></label><label>Escala Y <input type="number" name="scaleY" step="0.01"></label>
+              </details>
+              <label>Curva de saída <select name="curve"><option>linear</option><option>ease-in</option><option>ease-out</option><option>ease-in-out</option></select></label>
+              <div><button class="btn" value="add">Adicionar keyframe</button><button class="btn" value="remove">Remover keyframe</button><button class="btn" value="copy">Copiar pose</button><button class="btn" value="paste">Colar pose</button><button class="btn" value="reset">Repor pose inicial</button><button class="btn" value="demo">Demonstração do braço · 3 s</button></div>
+            </details>
+            <select id="edit-target" aria-label="Modo de edição"><option value="part">Ajustar Peça</option><option value="joint">Mover Articulação</option></select>
+            <div id="joint-tools" hidden>
+              <label><input type="checkbox" id="joint-patches"> Suavizar uniões do braço esquerdo</label>
+              <label>Rotação do osso (°) <input type="number" id="joint-angle" step="1"></label>
+              <button class="btn" id="reset-chain">Repor pose</button>
+            </div>
             <div class="toolbar-group">
               <button id="btn-select-part" class="btn btn-secondary" title="Selecionar Peça">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -213,6 +261,7 @@
                 </svg>
                 <span>Mover</span>
               </button>
+              <button id="btn-rotate-part" class="btn">Rodar</button><button id="btn-scale-part" class="btn">Escala</button><label><input id="lock-scale" type="checkbox" checked> Proporcional</label>
               <button id="btn-edit-pivot" class="btn btn-secondary" title="Editar Pivô" disabled>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"></circle>
@@ -335,7 +384,6 @@
                </div>
              </div>
            </div>
-          </div>
           
           
                        <!-- Painel de Reconhecimento Anatómico -->
@@ -348,6 +396,7 @@
                
                <!-- Estado: Pronto - Botão para iniciar -->
                <div id="recognition-ready" class="ready-state">
+                 <label>Modelo <select id="recognition-method"><option value="BodyPix">BodyPix · partes anatómicas</option><option value="MediaPipeSelfieSegmentation">MediaPipe · pessoa e armadura</option></select></label>
                  <p class="ready-hint">O modelo analisará a silhueta e a armadura para propor máscaras anatómicas.</p>
                  <button id="btn-start-recognition" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -395,38 +444,6 @@
                 <div id="recognition-error" class="error-message hidden"></div>
               </div>
             </div>
-                     <span id="recognition-progress-text" class="progress-text">0%</span>
-                   </div>
-                   <div id="recognition-progress-message" class="progress-message">A preparar...</div>
-                   <button id="btn-cancel-recognition" class="btn btn-secondary btn-sm">Cancelar</button>
-                 </div>
-               </div>
-               
-               <div id="recognition-results" class="hidden">
-                 <div id="recognition-quality-summary" class="results-summary"></div>
-                 <div class="action-buttons">
-                   <button id="btn-apply-recognition" class="btn btn-primary">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <polyline points="20 6 9 17 4 12"></polyline>
-                     </svg>
-                     Aplicar Reconhecimento
-                   </button>
-                   <button id="btn-cancel-recognition-result" class="btn btn-secondary">
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <line x1="18" y1="6" x2="6" y2="18"></line>
-                       <line x1="6" y1="6" x2="18" y2="18"></line>
-                     </svg>
-                     Cancelar
-                   </button>
-                 </div>
-                 <div class="hint-text">
-                   As regiões atuais serão preservadas para permitir reverter. Clique em "Aplicar Reconhecimento" para substituir.
-                 </div>
-               </div>
-               
-               <div id="recognition-error" class="error-message hidden"></div>
-             </div>
-           </div>
            
            <!-- Painel do Calibrar Armadura -->
            <div id="calibration-panel" class="calibration-panel hidden">
@@ -442,85 +459,8 @@
             <ul id="parts-list" class="parts-list"></ul>
           </div>
           
-          <!-- Painel de propriedades da peça selecionada -->
-          <div id="part-properties-form" class="properties-form hidden">
-            <div class="form-group">
-              <label for="part-prop-name">Nome</label>
-              <input type="text" id="part-prop-name" readonly>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-bone">Osso</label>
-              <output id="part-prop-bone">—</output>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-pivot">Pivô</label>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="part-prop-pivot-x">X</label>
-                  <input type="number" id="part-prop-pivot-x" step="0.01" min="0" max="1" value="0.5">
-                </div>
-                <div class="form-group">
-                  <label for="part-prop-pivot-y">Y</label>
-                  <input type="number" id="part-prop-pivot-y" step="0.01" min="0" max="1" value="0.5">
-                </div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-visible">Visível</label>
-              <input type="checkbox" id="part-prop-visible" checked>
-            </div>
-            
-            <div class="form-group">
-              <label>Posição Local</label>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="part-prop-x">X</label>
-                  <input type="number" id="part-prop-x" step="0.1">
-                </div>
-                <div class="form-group">
-                  <label for="part-prop-y">Y</label>
-                  <input type="number" id="part-prop-y" step="0.1">
-                </div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="part-prop-rotation">Rotação Local (graus)</label>
-              <div class="form-row" style="align-items: center; gap: 8px;">
-                <input type="number" id="part-prop-rotation" step="1" min="-180" max="180" value="0" style="width: 80px;">
-                <input type="range" id="part-prop-rotation-slider" min="-180" max="180" value="0" style="flex: 1;">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="part-prop-scale-x">Escala X</label>
-                <input type="number" id="part-prop-scale-x" step="0.01" min="0.01" value="1" style="width: 80px;">
-              </div>
-              <div class="form-group">
-                <label for="part-prop-scale-y">Escala Y</label>
-                <input type="number" id="part-prop-scale-y" step="0.01" min="0.01" value="1" style="width: 80px;">
-              </div>
-            </div>
-            <div class="form-group">
-              <button id="btn-reset-part-adjustments" class="btn btn-secondary" title="Repor Ajustes">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                  <path d="M3 3v5h5"></path>
-                </svg>
-                Repor Ajustes
-              </button>
-              <button id="btn-delete-part" class="btn btn-danger" title="Eliminar Peça">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                Eliminar Peça
-              </button>
-            </div>
-          </div>
-          
           <!-- Painel de propriedades normal -->
+          <details open id="properties-form" class="properties-form hidden"><summary>Propriedades</summary>
             <div class="form-group">
               <label for="prop-name">Nome</label>
               <input type="text" id="prop-name" readonly>
@@ -550,40 +490,7 @@
               </div>
             </div>
             <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformação</button>
-          </div>
-          
-          <!-- Painel de propriedades normal -->
-          <div id="properties-form" class="properties-form hidden">
-            <div class="form-group">
-              <label for="prop-name">Nome</label>
-              <input type="text" id="prop-name" readonly>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="prop-x">Posição X</label>
-                <input type="number" id="prop-x" step="0.1">
-              </div>
-              <div class="form-group">
-                <label for="prop-y">Posição Y</label>
-                <input type="number" id="prop-y" step="0.1">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="prop-rotation">Rotação (graus)</label>
-              <input type="number" id="prop-rotation" step="0.1">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="prop-scale-x">Escala X</label>
-                <input type="number" id="prop-scale-x" step="0.01" min="0.01">
-              </div>
-              <div class="form-group">
-                <label for="prop-scale-y">Escala Y</label>
-                <input type="number" id="prop-scale-y" step="0.01" min="0.01">
-              </div>
-            </div>
-            <button id="btn-reset-transform" class="btn btn-secondary">Repor Transformaçăo</button>
-          </div>
+          </details>
           
           <!-- Painel de rigging (armadura) -->
           <div id="rigging-panel" class="rigging-panel hidden">

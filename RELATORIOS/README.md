@@ -9,6 +9,21 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-24 | Protótipo de malha local | Campo de rotação no braço esquerdo; comparação visual e limitações | Experimental, desligado por defeito | [Relatório](2026-11-24_prototipo_malha_local.md) | commit desta atualização |
+| 2026-11-24 | Contactos e navegação | Fixação independente do modo, contacto raster ajustável, diagnóstico e cinco modos permanentes | Testado; estética pendente | [Relatório](2026-11-24_contactos_e_navegacao.md) | commit desta atualização |
+| 2026-11-24 | Diagnóstico estrutural | Comparação de três arquiteturas e gravação | Causas reproduzidas | [Relatório](2026-11-24_diagnostico_estrutural.md) | PR #1 |
+| 2026-11-23 | Validação da barra fixa | Fase 2D.7 E | Testado em Chromium | [Relatório](2026-11-23_2D7_E.md) | PR #1 |
+| 2026-11-23 | Ciclo de cinco segundos | Fase 2D.7 D | Testado em Chromium | [Relatório](2026-11-23_2D7_D.md) | 08cb454 |
+| 2026-11-23 | Correções raster por pose | Fase 2D.7 C | Testado em Chromium | [Relatório](2026-11-23_2D7_C.md) | c3a7a04 |
+| 2026-11-23 | IK bilateral | Fase 2D.7 B | Testado em Chromium | [Relatório](2026-11-23_2D7_B.md) | f070854 |
+| 2026-11-23 | Estação e pegas | Fase 2D.7 A | Testado em Chromium | [Relatório](2026-11-23_2D7_A.md) | e516a70 |
+| 2026-11-23 | Timeline e poses | Ciclo do braço de três segundos | Testado em Chromium | [Relatório](2026-11-23_2D6_C.md) | PR #1 |
+| 2026-11-23 | Uniões do braço esquerdo | Comparação de texturas em quatro ângulos | Protótipo | [Relatório](2026-11-23_2D6_B.md) | PR #1 |
+| 2026-11-23 | Interface do editor | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_interface_editor.md) | PR #1 |
+| 2026-11-23 | Edição de peças raster | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_edicao_pecas_raster.md) | PR #1 |
+| 2026-11-23 | Rigging e persistência | Fase 2D.5 | Testado em Chromium | [Relatório](2026-11-23_rigging_persistencia.md) | PR #1 |
+| 2026-11-22 | Bacia e tornozelos | 72/72 pontos interpretáveis após revisão no treinador | Testado | [Relatório](2026-11-22_bacia_tornozelos_bodypix.md) | PR #1 |
+| 2026-11-22 | Recuperação do fluxo raster | BodyPix local, calibração, recorte e reabertura | Testado | [Relatório](2026-11-22_recuperacao_fluxo_raster.md) | 06f0868 |
 | 2026-11-22 | Correção Distribuição Anatómica 2D.3 | Polígonos (tronco), eliminação sobreposições, transformações corretas | 🧪 Em teste | [2026-11-22_correcao_distribuicao_anatomica.md](./2026-11-22_correcao_distribuicao_anatomica.md) | — |
 | 2026-11-22 | Correção Leitura Real da Máscara | Correção de 3 erros: person.mask vs segmentation, toImageData() assíncrono, leitura canal alfa RGBA | 🧪 Em teste | [2026-11-22_correcao_leitura_mascara.md](./2026-11-22_correcao_leitura_mascara.md) | — |
 | 2026-11-22 | Correção API Segmentação — segmentPeople() | estimatePeopleSegments() → segmentPeople() no MediaPipeSelfieSegmentation | 🧪 Em teste | [2026-11-22_correcao_api_segmentacao.md](./2026-11-22_correcao_api_segmentacao.md) | — |
@@ -39,3 +54,6 @@
 - Relatórios mais antigos podem ter menos detalhes (formato anterior à padronização).
 - Commits indicados referem-se ao hash do commit base antes das alterações da tarefa.
 - Para atualizações sem commit, o estado reflete alterações locais pendentes.
+- [Editor de peças, pivô e cadeia do braço](2026-11-23_cadeia_braco.md)
+
+- [Fase 2D.6 A — geração em lote e reabertura](2026-11-23_2D6_A.md)

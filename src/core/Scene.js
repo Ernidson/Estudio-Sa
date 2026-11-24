@@ -10,6 +10,9 @@ import { PieceMap } from '../parts/PieceMap.js';
 
 export class SceneObject {
   constructor(data = {}) {
+    this.pullup = data.pullup ?? null;
+    this.animation = data.animation ?? null;
+    this.armJointPatches = data.armJointPatches !== false;
     this.id = data.id || generateId();
     this.name = data.name || 'Objeto';
     this.type = data.type || 'image';
@@ -121,6 +124,9 @@ export class SceneObject {
       imageData: this.imageData,
       imageWidth: this.imageWidth,
       imageHeight: this.imageHeight,
+      ...(this.pullup && {pullup:this.pullup}),
+      ...(this.animation && {animation:this.animation}),
+      armJointPatches: this.armJointPatches,
       transform: this.transform.toJSON(),
       layerOrder: this.layerOrder,
       rig: this.rig ? this.rig.toJSON() : null,
@@ -296,7 +302,8 @@ export class Scene {
    * Carrega todas as imagens
    */
   async loadAllImages() {
-    await Promise.all(this.objects.map(o => o.loadImage()));
+    await Promise.all(this.objects.flatMap(obj => [obj.loadImage(),
+      ...(obj.partManager?.getAllParts() || []).map(part => part.loadImage())]));
   }
 
   /**

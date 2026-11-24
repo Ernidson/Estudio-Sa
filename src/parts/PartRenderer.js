@@ -1,3 +1,6 @@
+import {drawLocalJointMeshes} from './LocalJointMesh.js';
+import {drawCorrectives,elevation} from '../pullup/Correctives.js';
+import {drawArmJoints} from './ArmJointPatch.js';
 /**
  * PartRenderer - Renderiza peças recortadas sobre o personagem
  */
@@ -32,6 +35,15 @@ export class PartRenderer {
     // Garante que transformações mundiais dos bones estão atualizadas
     partManager.rig.computeWorldTransforms();
     
+    const output=this.ctx;
+    const isolate=characterObject.pullup?.patches?.length && characterObject.pullup.correct!==false && elevation(characterObject)>0;
+    if(isolate) {
+      const layer=this.correctiveLayer??=document.createElement('canvas');
+      if(layer.width!==output.canvas.width)layer.width=output.canvas.width;
+      if(layer.height!==output.canvas.height)layer.height=output.canvas.height;
+      this.ctx=layer.getContext('2d');
+      this.ctx.clearRect(0,0,layer.width,layer.height);
+    }
     this.ctx.save();
     
     // Aplica transformação do personagem + viewport
@@ -55,12 +67,42 @@ export class PartRenderer {
       combined.m[4], combined.m[5]
     );
     
+    if (characterObject.armJointPatches !== false) drawArmJoints(this.ctx, parts, partManager.rig);
+
+    this.meshStats = drawLocalJointMeshes(this.ctx,characterObject);
+
     // Desenha cada peça na posição do seu bone
     for (const part of parts) {
+      part.selected = part.id === partManager.selectedPartId;
       this.drawPart(part, partManager.rig);
     }
     
+    drawCorrectives(this.ctx,characterObject);
     this.ctx.restore();
+    if(isolate) {
+      this.ctx=output;
+      output.drawImage(this.correctiveLayer,0,0);
+    }
+    const selected = partManager.getSelectedPart();
+    if (selected?.visible && selected.imageElement) {
+      const bone = partManager.rig.getBone(selected.boneId);
+      if (!bone) return;
+      const point = combined.multiply(bone.worldTransform).multiply(selected.localTransform).transformPoint(0, 0);
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+      this.ctx.moveTo(point.x - 10, point.y);
+      this.ctx.lineTo(point.x + 10, point.y);
+      this.ctx.moveTo(point.x, point.y - 10);
+      this.ctx.lineTo(point.x, point.y + 10);
+      this.ctx.lineWidth = 4;
+      this.ctx.strokeStyle = '#17212b';
+      this.ctx.stroke();
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeStyle = '#ffcf33';
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
   }
   
   /**
@@ -109,6 +151,13 @@ export class PartRenderer {
   /**
    * Desenha indicador de seleção
    */
+  hitsRotationHandle(part,obj,x,y) {
+    const bone=obj.rig.getBone(part.boneId);
+    const m=this.renderer.viewport.clone().multiply(obj.transform).multiply(bone.worldTransform).multiply(part.localTransform);
+    const pt=m.transformPoint((.5-part.pivot.x)*part.imageWidth,-part.pivot.y*part.imageHeight-14);
+    return Math.hypot(pt.x-x,pt.y-y)<12;
+  }
+
   drawSelection(part) {
     const w = part.imageWidth;
     const h = part.imageHeight;
@@ -122,10 +171,14 @@ export class PartRenderer {
     const pivotY = part.pivot.y * part.imageHeight;
     
     this.ctx.beginPath();
-    this.ctx.rect(-w/2, -h/2, w, h);
+    this.ctx.rect(-pivotX, -pivotY, w, h);
     this.ctx.stroke();
     this.ctx.setLineDash([]);
     
+    this.ctx.fillStyle='#fdc400';
+    for (const [x,y] of [[0,0],[w/2-pivotX,-pivotY-14]]) {
+      this.ctx.beginPath(); this.ctx.arc(x,y,5,0,2*Math.PI); this.ctx.fill();
+    }
     // Handles nos cantos
     const handleSize = 8;
     const corners = [
@@ -164,63 +217,20 @@ export class PartRenderer {
     const charInv = characterObject.transform.getInverse();
     const charLocal = charInv.transformPoint(worldPos.x, worldPos.y);
     
-    // Inverte baseTransform do rig
-    const rig = partManager.rig;
-    const baseInv = rig.baseTransform.getInverse();
-    const rigLocal = baseInv.transformPoint(charLocal.x, charLocal.y);
-    
-    // Testa peças em ordem reversa (topo primeiro)
-    const parts = partManager.getPartsForRendering().reverse();
-    
-    for (const part of parts) {
-      if (!part.visible || !part.imageElement) continue;
-      
-      // Transforma ponto para espaço local da peça
-      const inv = part.localTransform.getInverse();
-      const local = inv.transformPoint(rigLocal.x, rigLocal.y);
-      const localX = local.x;
-      const localY = local.y;
-      
-      // Verifica se está dentro dos limites da imagem
-      if (localX >= -part.imageWidth/2 && localX <= part.imageWidth/2 &&
-          localY >= -part.imageHeight/2 && localY <= part.imageHeight/2) {
-        
-        // Se tem máscara, verifica máscara
-        if (part.mask) {
-          if (part.mask.type === 'rect') {
-            const b = part.mask.bounds;
-            if (localX >= b.x && localX <= b.x + b.width &&
-                localY >= b.y && localY <= b.y + b.height) {
-              return part;
-            }
-          } else if (part.mask.type === 'polygon') {
-            // Point in polygon test
-            if (this._pointInPolygon(localX, localY, part.mask.points)) {
-              return part;
-            }
-          }
-        } else {
-          // Sem máscara - testa bounds da imagem
-          return part;
-        }
-      }
+    for (const part of partManager.getPartsForRendering().reverse()) {
+      const bone = partManager.rig.getBone(part.boneId);
+      if (!bone || !part.visible || !part.imageElement) continue;
+      const transform = bone.worldTransform.clone().multiply(part.localTransform);
+      const point = transform.inverseTransformPoint(charLocal.x, charLocal.y);
+      const x = Math.floor(point.x + part.pivot.x * part.imageWidth);
+      const y = Math.floor(point.y + part.pivot.y * part.imageHeight);
+      if (x < 0 || y < 0 || x >= part.imageWidth || y >= part.imageHeight) continue;
+      const sample = document.createElement('canvas');
+      sample.width = sample.height = 1;
+      const ctx = sample.getContext('2d');
+      ctx.drawImage(part.imageElement, x, y, 1, 1, 0, 0, 1, 1);
+      if (ctx.getImageData(0, 0, 1, 1).data[3]) return part;
     }
-    
     return null;
-  }
-  
-  /**
-   * Point in polygon test
-   */
-  _pointInPolygon(x, y, points) {
-    let inside = false;
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-      const xi = points[i].x, yi = points[i].y;
-      const xj = points[j].x, yj = points[j].y;
-      const intersect = ((yi > y) !== (yj > y)) &&
-                       (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
   }
 }

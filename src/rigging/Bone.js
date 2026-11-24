@@ -31,6 +31,7 @@ export class Bone {
     
     // Hierarquia
     this.children = [];
+    this.poseReferenceAngle = data.poseReferenceAngle ?? null;
     this.parent = null;
     
     // Visual
@@ -49,9 +50,8 @@ export class Bone {
    * Preserva a rotação e escala existentes, apenas atualiza a translação
    */
   updateLocalTransform() {
-    const currentRotation = this.localTransform.getRotation();
-    const currentScale = this.localTransform.getScale();
-    this.localTransform = createTransform(this.localPosition.x, this.localPosition.y, currentRotation, currentScale.x, currentScale.y);
+    this.localTransform.m[4] = this.localPosition.x;
+    this.localTransform.m[5] = this.localPosition.y;
   }
 
   /**
@@ -67,25 +67,36 @@ export class Bone {
    * Define rotação local em graus
    */
   setLocalRotation(degrees) {
-    const currentPos = this.localTransform.getTranslation();
-    const currentScale = this.localTransform.getScale();
-    const radians = degrees * Math.PI / 180;
-    this.localTransform = createTransform(currentPos.x, currentPos.y, radians, currentScale.x, currentScale.y);
-    // Atualiza localPosition para manter consistência
-    this.localPosition.x = currentPos.x;
-    this.localPosition.y = currentPos.y;
+    const delta = degrees - this.getLocalRotation();
+    const m = this.localTransform.m;
+    const linear = createTransform(0, 0, delta);
+    linear.multiply(this.localTransform);
+    linear.m[4] = m[4];
+    linear.m[5] = m[5];
+    this.localTransform = linear;
   }
 
   /**
    * Obtém rotação local em graus
    */
   getLocalRotation() {
-    return this.localTransform.getRotation() * 180 / Math.PI;
+    return this.localTransform.decompose().rotation;
   }
 
   /**
    * Adiciona rotação local (relativa)
    */
+  poseAt(degrees) {
+    this.poseReferenceAngle ??= this.getLocalRotation();
+    this.setLocalRotation(degrees);
+  }
+
+  restorePose() {
+    if (this.poseReferenceAngle === null) return;
+    this.setLocalRotation(this.poseReferenceAngle);
+    this.poseReferenceAngle = null;
+  }
+
   rotateLocal(deltaDegrees) {
     const currentRotation = this.getLocalRotation();
     this.setLocalRotation(currentRotation + deltaDegrees);
@@ -217,6 +228,7 @@ export class Bone {
       parentId: this.parentId,
       localPosition: { ...this.localPosition },
       localTransform: this.localTransform.toJSON(),
+      poseReferenceAngle: this.poseReferenceAngle,
       length: this.length,
       color: this.color,
       visible: this.visible,
