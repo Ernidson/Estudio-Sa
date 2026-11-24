@@ -1,3 +1,4 @@
+import {contactUV, measureArm, drawArmDiagnostic} from './Diagnostics.js';
 import {SceneObject} from '../core/Scene.js';
 
 export const sides=['esquerdo','direito'];
@@ -16,7 +17,7 @@ function handContact(obj,side) {
   if (!hand?.mask?.bounds) throw Error('Gera as duas peças das mãos antes de associar a barra.');
   const point=wrist.worldTransform.clone().multiply(hand.localTransform).transformPoint(
     (0.5-hand.pivot.x)*hand.imageWidth,(0.45-hand.pivot.y)*hand.imageHeight);
-  return {point, wrist:wrist.getWorldPoint(), angle:wrist.getWorldRotation?.() ?? wrist.worldTransform.decompose().rotation};
+  return {point, uv:{x:0.5,y:0.45}, wrist:wrist.getWorldPoint(), angle:wrist.getWorldRotation?.() ?? wrist.worldTransform.decompose().rotation};
 }
 export async function attachBar(scene,obj,file) {
   const {image,data}=await readPNG(file);
@@ -36,7 +37,7 @@ export async function attachBar(scene,obj,file) {
   bar.transform.compose((points[0].x+points[1].x)/2,(points[0].y+points[1].y)/2-rail*scale,0,scale,scale);
   scene.addObject(bar);bar.layerOrder=Math.min(...scene.objects.map(o=>o.layerOrder))-1;scene.sortObjects();
   obj.pullup={barId:bar.id,fixed:true,height:280,restY:obj.rig.getRoot().localPosition.y,contacts,
-    grips:points.map(p=>({x:bar.transform.inverseTransformPoint(p.x,p.y).x,y:bar.transform.inverseTransformPoint(p.x,p.y).y}))};
+    rail, grips:points.map(p=>({x:bar.transform.inverseTransformPoint(p.x,p.y).x,y:bar.transform.inverseTransformPoint(p.x,p.y).y}))};
   return bar;
 }
 
@@ -46,7 +47,11 @@ export function setupStation(panel,getCharacter,getScene,updated) {
   function refresh() {
     const obj=getCharacter(), structure=bar();
     field('settings').hidden=!structure;
+    field('association').textContent = structure
+      ? 'Estrutura associada · ' + (obj.pullup.fixed ? 'duas mãos fixas' : 'mãos livres')
+      : 'Sem estrutura associada. Gera as mãos e importa a estrutura PNG para disponibilizar Fixar as duas mãos.';
     if(!structure)return;
+    previewHand();
     const config=obj.pullup, m=structure.transform.m;
     field('locked').checked=structure.locked;field('fixed').checked=config.fixed;
     for(const [n,v] of Object.entries({barX:m[4],barY:m[5],size:Math.hypot(m[0],m[1])})) {
@@ -54,6 +59,29 @@ export function setupStation(panel,getCharacter,getScene,updated) {
     }
     config.grips.forEach((p,i)=>{for(const axis of ['x','y'])field(axis+i).value=p[axis];});
   }
+  function previewHand() {
+    const obj = getCharacter();
+    const index = Number(field('hand').value);
+    const part = obj?.partManager?.getAllParts().find(p => p.boneId === 'pulso_' + sides[index]);
+    const canvas = field('hand-preview'), ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if (!part?.imageElement) return;
+    ctx.drawImage(part.imageElement,0,0,canvas.width,canvas.height);
+    const uv = contactUV(obj.pullup.contacts[index]);
+    ctx.strokeStyle = '#40ffb0';ctx.lineWidth = 2;
+    ctx.beginPath();ctx.arc(uv.x*canvas.width,uv.y*canvas.height,5,0,Math.PI*2);ctx.stroke();
+  }
+  field('hand').onchange = previewHand;
+  field('hand-preview').onclick = event => {
+    const obj = getCharacter();
+    if (!obj?.pullup) return;
+    const rect = event.target.getBoundingClientRect();
+    obj.pullup.contacts[Number(field('hand').value)].uv = {
+      x: Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),
+      y: Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))
+    };
+    previewHand();
+  };
   field('structure').onchange=async e=>{
     const file=e.target.files[0];if(!file)return;
     try {
@@ -75,8 +103,20 @@ export function setupStation(panel,getCharacter,getScene,updated) {
     refresh();
   };
   function drawGrips(ctx,viewport) {
-    if(!panel.open || panel.closest('.hidden'))return;
     const structure=bar();if(!structure)return;
+    const obj=getCharacter();
+    const samples=sides.map((side,i)=>measureArm(obj,structure,side,i));
+    const error=Math.max(...samples.filter(Boolean).map(s=>s.error));
+    const status = obj.pullup.fixed
+      ? (error > .1 ? 'Contacto fora de alcance: ' : 'Erro do contacto desenhado: ') + error.toFixed(2) + ' px'
+      : 'Fixação desligada';
+    if(field('status').textContent !== status)field('status').textContent=status;
+    if(field('diagnostic').checked) {
+      samples.forEach((sample,i)=>drawArmDiagnostic(ctx,viewport,sample,i?'D':'E'));
+      const text=samples.map((s,i)=>s ? `${i?'D':'E'} · flexão ${s.flexion.toFixed(1)}° · contacto ${s.error.toFixed(2)} px` : 'Mão não disponível').join('\n');
+      if(field('measurements').textContent!==text)field('measurements').textContent=text;
+    } else field('measurements').textContent='';
+    if(!panel.open || panel.closest('.hidden'))return;
     const transform=viewport.clone().multiply(structure.transform);
     ctx.save();ctx.lineWidth=2;ctx.strokeStyle='#ffcd48';ctx.fillStyle='#ffcd48';
     getCharacter().pullup.grips.forEach((g,i)=>{

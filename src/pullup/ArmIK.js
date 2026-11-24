@@ -1,4 +1,5 @@
 import {sides} from './Station.js';
+import {contactUV} from './Diagnostics.js';
 
 const deg=r=>r*180/Math.PI;
 const direction=(x,y)=>Math.atan2(y,x);
@@ -37,7 +38,8 @@ export function constrainArms(obj,bar) {
     const hand=obj.partManager.getAllParts().find(p=>p.boneId===wrist.id);
     let ox=contact.point.x-contact.wrist.x, oy=contact.point.y-contact.wrist.y;
     if(hand){
-      const texel=hand.localTransform.transformPoint((.5-hand.pivot.x)*hand.imageWidth,(.45-hand.pivot.y)*hand.imageHeight);
+      const uv = contactUV(contact);
+      const texel=hand.localTransform.transformPoint((uv.x-hand.pivot.x)*hand.imageWidth,(uv.y-hand.pivot.y)*hand.imageHeight);
       const current=wrist.worldTransform.transformVector(texel.x,texel.y);
       const angle=(contact.angle-wrist.worldTransform.decompose().rotation)*Math.PI/180;
       ox=current.x*Math.cos(angle)-current.y*Math.sin(angle);

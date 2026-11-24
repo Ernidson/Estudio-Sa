@@ -46,15 +46,7 @@
           </svg>
           Importar PNG
         </button>
-        <button id="btn-prepare-character" class="btn" title="Preparar Personagem (Criar Armadura)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          Preparar Personagem
-        </button>
+
         <button id="btn-cut-piece" class="btn" title="Recortar Peça" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6.5 6.5h11v11h-11z"></path>
@@ -66,33 +58,9 @@
           </svg>
           Recortar Peça
         </button>
-        <button id="btn-piece-map" class="btn" title="Mapa de Peças" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
-          </svg>
-          Mapa de Peças
-        </button>
-        <button id="btn-edit-parts" class="btn" title="Editar Peças" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5a2.121 2.121 0 0 1 3 3z"></path>
-          </svg>
-          Editar Peças
-        </button>
-        <button id="btn-calibrate-armor" class="btn" title="Calibrar Armadura" style="display: none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="2" x2="12" y2="6"></line>
-            <line x1="12" y1="18" x2="12" y2="22"></line>
-            <line x1="2" y1="12" x2="6" y2="12"></line>
-            <line x1="18" y1="12" x2="22" y2="12"></line>
-            <path d="M12 12l4 0"></path>
-          </svg>
-          Calibrar Armadura
-        </button>
+
+
+
         <button id="btn-exit-rigging" class="btn" title="Sair Modo Armadura" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -102,7 +70,39 @@
         </button>
         <input type="file" id="file-import-png" accept="image/png" style="position: absolute; left: -9999px; opacity: 0; pointer-events: none;">
       </div>
-    </header>
+    </header><nav id="mode-navigation" aria-label="Modos da personagem"><button id="btn-prepare-character" class="btn" data-mode="prepare" title="Preparar Personagem (Criar Armadura)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Preparar Personagem
+        </button><button id="btn-calibrate-armor" class="btn" data-mode="calibrate" title="Calibrar Armadura" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="2" x2="12" y2="6"></line>
+            <line x1="12" y1="18" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="6" y2="12"></line>
+            <line x1="18" y1="12" x2="22" y2="12"></line>
+            <path d="M12 12l4 0"></path>
+          </svg>
+          Calibrar Armadura
+        </button><button id="btn-piece-map" class="btn" data-mode="map" title="Mapa de Peças" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          Mapa de Peças
+        </button><button id="btn-edit-parts" class="btn" data-mode="edit" title="Editar Peças" >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5a2.121 2.121 0 0 1 3 3z"></path>
+          </svg>
+          Editar Peças
+        </button><button class="btn" id="btn-animation-mode" data-mode="animation">Animação</button><output id="mode-message" aria-live="polite"></output></nav>
 
     <!-- Área principal -->
     <main class="main-area">
@@ -197,8 +197,13 @@
           <div id="edit-parts-toolbar" class="edit-parts-toolbar hidden">
             <details id="pullup-station"><summary>Barra fixa</summary>
               <label>Estrutura PNG <input name="structure" type="file" accept="image/png"></label>
-              <output name="status"></output>
-              <div name="settings" hidden><label><input name="locked" type="checkbox"> Bloquear estrutura</label>
+              <output name="association"></output><output name="status"></output>
+<label><input name="diagnostic" type="checkbox"> Diagnóstico visual</label>
+<output name="measurements"></output>
+              <div name="settings" hidden>
+<label>Contacto na textura <select name="hand"><option value="0">Mão esquerda</option><option value="1">Mão direita</option></select></label>
+<p>Clica no ponto da mão que deve tocar na barra. Verde: contacto; amarelo: alvo; rosa: punho. Coordenadas em píxeis da cena.</p>
+<canvas name="hand-preview" width="240" height="140" style="width:100%;max-width:240px;background:#30343d"></canvas><label><input name="locked" type="checkbox"> Bloquear estrutura</label>
               <label><input name="fixed" type="checkbox"> Fixar as duas mãos</label>
               <label>Barra X <input name="barX" type="number" step="any"></label><label>Barra Y <input name="barY" type="number" step="any"></label><label>Escala <input name="size" type="number" step="any"></label><label>Pega E · X <input name="x0" type="number" step="any"></label><label>Y <input name="y0" type="number" step="any"></label><label>Pega D · X <input name="x1" type="number" step="any"></label><label>Y <input name="y1" type="number" step="any"></label></div></details>
             <details id="pose-corrections"><summary>Correções por pose</summary>

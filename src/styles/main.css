@@ -1309,3 +1309,13 @@ body {
 #animation-editor label:has(input[name=cursor]) {display:block}
 #pullup-station label {display:inline-block;margin:3px} #pullup-station input[type=number]{width:6em} #pullup-station input[type=file]{max-width:100%}
 #pose-corrections label{display:inline-block;margin:3px} #pose-corrections input[type=number]{width:5em} #pose-corrections input[type=file]{max-width:100%}
+
+/* Permanent mode navigation is independent of legacy panel visibility. */
+#mode-navigation { display:flex; flex-wrap:wrap; gap:4px; padding:4px 10px; flex-shrink:0; background:var(--bg-secondary,#20232b); }
+#mode-navigation button { display:inline-flex !important; font-size:12px; padding:5px 9px; }
+#mode-navigation button[aria-pressed="true"] { outline:1px solid #85aaff; }
+#mode-navigation svg { display:none; }
+#mode-message { align-self:center; font-size:12px; color:#ffd347; }
+#pullup-station output { display:block; white-space:pre-line; font-size:12px; }
+
+#mode-navigation #btn-prepare-character { background:transparent; border-color:transparent; }

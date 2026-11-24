@@ -193,11 +193,11 @@ async function init() {
  */
 function renderLoop(now) {
   app.timeline?.tick(now);
-  if (app.isEditPartsMode && app.currentCharacterObject?.pullup?.fixed) {
-    const error=constrainArms(app.currentCharacterObject,app.station.bar());
-    const status=document.querySelector('#pullup-station [name=status]');
-    const message=error>0.1 ? 'Pega fora de alcance · '+error.toFixed(1)+' px' : '';
-    if(status.textContent!==message)status.textContent=message;
+  // A scene constraint must not depend on which editor panel is open.
+  for (const obj of app.scene.objects) {
+    if (!obj.pullup?.fixed || !obj.rig) continue;
+    const bar = app.scene.objects.find(item => item.id === obj.pullup.barId);
+    constrainArms(obj, bar);
   }
   const original = app.isCalibrationMode ? app.currentCharacterObject : null;
   app.renderer.render(app.scene, original, app.isEditPartsMode && !!app.currentCharacterObject?.pullup);
@@ -207,7 +207,7 @@ function renderLoop(now) {
     if (obj !== original && obj.partManager) app.partRenderer.drawParts(obj.partManager, obj);
   }
   
-  if (app.isEditPartsMode) app.station.drawGrips(app.renderer.ctx,app.renderer.viewport);
+  app.station?.drawGrips(app.renderer.ctx,app.renderer.viewport);
 
   // Render preview de recorte se no modo de recorte
   if (app.isCuttingMode && app.cuttingData && app.partManager && app.partRenderer) {
@@ -367,7 +367,8 @@ function setupEventListeners() {
   document.getElementById('btn-import-png').addEventListener('click', () => app.imageImporter.openFilePicker());
   
   // Rigging (Fase 2)
-  document.getElementById('btn-prepare-character').addEventListener('click', prepareCharacter);
+  document.getElementById('btn-prepare-character').addEventListener('click', () => navigateMode('prepare'));
+  document.getElementById('btn-animation-mode').addEventListener('click', () => navigateMode('animation'));
   document.getElementById('btn-exit-rigging').addEventListener('click', exitRiggingMode);
   
   // Recorte de peças (Fase 2B)
@@ -376,7 +377,7 @@ function setupEventListeners() {
   document.getElementById('btn-cancel-cut').addEventListener('click', exitCuttingMode);
   
   // Mapa de Peças (Fase 2B.1)
-  document.getElementById('btn-piece-map').addEventListener('click', togglePieceMapMode);
+  document.getElementById('btn-piece-map').addEventListener('click', () => navigateMode('map'));
   const generateAll = document.getElementById('generate-all');
   const undo = document.getElementById('undo-batch');
   const report = document.getElementById('batch-report');
@@ -407,7 +408,7 @@ function setupEventListeners() {
   document.getElementById('btn-preview-piece').addEventListener('click', () => previewPieceFromMap());
   
   // Editor de Peças (Fase 2B.3)
-  document.getElementById('btn-edit-parts').addEventListener('click', toggleEditPartsMode);
+  document.getElementById('btn-edit-parts').addEventListener('click', () => navigateMode('edit'));
   app.corrections = correctiveEditor(document.querySelector("#pose-corrections"),()=>app.currentCharacterObject);
   app.station = setupStation(document.querySelector("#pullup-station"),()=>app.currentCharacterObject,()=>app.scene,()=>{updateLayersPanel();app.timeline.select(app.currentCharacterObject);app.renderer.fitToObjects(app.scene.getVisibleObjects());});
   app.timeline = timelineEditor(document.getElementById('animation-editor'), () => updateEditPartsPanel());
@@ -432,7 +433,7 @@ function setupEventListeners() {
   document.getElementById('btn-exit-edit-parts').addEventListener('click', exitEditPartsMode);
 
   // Calibrar Armadura (Fase 2C)
-  document.getElementById('btn-calibrate-armor').addEventListener('click', toggleCalibrationMode);
+  document.getElementById('btn-calibrate-armor').addEventListener('click', () => navigateMode('calibrate'));
   document.getElementById('btn-exit-calibration').addEventListener('click', exitCalibrationMode);
   document.getElementById('calib-tool-joints').addEventListener('click', () => setCalibrationTool('joints'));
   document.getElementById('calib-tool-regions').addEventListener('click', () => setCalibrationTool('regions'));
@@ -1126,6 +1127,41 @@ async function saveProject() {
 /**
  * Prepara personagem - cria rig automático para objeto selecionado
  */
+async function navigateMode(mode) {
+  const obj = app.selectionManager.getSelectedObject();
+  const message = document.getElementById('mode-message');
+  if (!obj || !obj.imageElement) {
+    message.textContent = 'Importa e seleciona a imagem da personagem.';
+    return;
+  }
+  if (mode !== 'prepare' && !obj.rig) {
+    message.textContent = 'Prepara primeiro a armadura da personagem.';
+    return;
+  }
+  if (['edit', 'animation'].includes(mode) && !obj.partManager?.getAllParts().length) {
+    message.textContent = 'Gera pelo menos uma peça no Mapa de Peças.';
+    return;
+  }
+  exitCalibrationMode();
+  exitEditPartsMode();
+  exitPieceMapMode();
+  exitCuttingMode();
+  exitRiggingMode();
+  message.textContent = '';
+  if (mode === 'prepare') {
+    if (obj.rig) enterRiggingMode(obj);
+    else await prepareCharacter();
+  } else if (mode === 'calibrate') enterCalibrationMode();
+  else if (mode === 'map') enterPieceMapMode();
+  else {
+    enterEditPartsMode();
+    if (mode === 'animation') document.getElementById('animation-editor').open = true;
+  }
+  for (const button of document.querySelectorAll('#mode-navigation button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
+  }
+}
+
 async function prepareCharacter() {
   const obj = app.selectionManager.getSelectedObject();
   
