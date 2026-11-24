@@ -9,6 +9,7 @@
 
 | Data | Atualização | Resumo | Estado | Relatório | Commit |
 |------|-------------|--------|--------|-----------|--------|
+| 2026-11-24 | Diagnóstico estrutural | Comparação de três arquiteturas e gravação | Causas reproduzidas | [Relatório](2026-11-24_diagnostico_estrutural.md) | PR #1 |
 | 2026-11-23 | Validação da barra fixa | Fase 2D.7 E | Testado em Chromium | [Relatório](2026-11-23_2D7_E.md) | PR #1 |
 | 2026-11-23 | Ciclo de cinco segundos | Fase 2D.7 D | Testado em Chromium | [Relatório](2026-11-23_2D7_D.md) | 08cb454 |
 | 2026-11-23 | Correções raster por pose | Fase 2D.7 C | Testado em Chromium | [Relatório](2026-11-23_2D7_C.md) | c3a7a04 |
